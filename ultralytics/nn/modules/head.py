@@ -20,7 +20,7 @@ from .conv import Conv, DWConv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder", "v10Detect", "YOLOEDetect", "YOLOESegment"
+__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder", "v10Detect", "YOLOEDetect", "YOLOESegment", "Detect3D"
 
 
 class Detect(nn.Module):
@@ -230,6 +230,262 @@ class Detect(nn.Module):
         i = torch.arange(batch_size)[..., None]  # batch indices
         return torch.cat([boxes[i, index // nc], scores[..., None], (index % nc)[..., None].float()], dim=-1)
 
+class head_group(nn.Module):
+    def __init__(self, c_in, n_anchor=None, mergeBn=False):
+        super(head_group, self).__init__()
+        self.n_anchor = n_anchor
+
+        # need to be readin as parameters for different cameras
+        # sx = 800.0 / 3840.0
+        # sy = 320.0 / 1536.0
+        # self.cam_intrinsics = nn.Parameter(torch.tensor([2459.49*sx/100, 
+        #                                                  1920.62*sx/100, 
+        #                                                  2456.18*sy/100, 
+        #                                                  1086.58*sy/100, 
+        #                                                  -0.33891, 
+        #                                                  0.203, 
+        #                                                  -0.137994, 
+        #                                                  0.0447447], dtype=torch.float32)) #fu、cu、fv、cv、distort_coeffs
+        # self.cam_intrinsics.requires_grad = False
+        '''
+        For each face, output:
+            z3d: the 3d position of the center of this face
+            projected 3d center: u, v
+            size2d: 2 measurable dim of 'l', 'h', 'w'
+            face confidence: is this face visible from camera
+            Dim = 1 + 2 + 2 + 1 = 6
+        
+        To predict the whole 3D box of certain object such as Pedestrian at once:
+            z3d: the center of the 3D box
+            projected 3d center: u, v
+            lhw: the size of the 3D box
+            Dim = 1 + 2 + 3 = 6
+        
+        To predict heading:
+            yaw: the heading angle of the 3D box, predict sin(x) & cos(x), learning based on faces
+            Dim=2
+        '''
+        c_out = c_in
+        if mergeBn:
+            self.conv_3d = nn.Sequential(
+            nn.Conv2d(c_in, c_out, 3, 1, 1),
+        
+            nn.ReLU(),
+            nn.Conv2d(c_out, c_out, 3, 1, 1),
+         
+            nn.ReLU()
+                        )
+        else:
+            self.conv_3d = nn.Sequential(
+                nn.Conv2d(c_in, c_out, 3, 1, 1),
+                nn.BatchNorm2d(c_out),
+                nn.ReLU(),
+                nn.Conv2d(c_out, c_out, 3, 1, 1),
+                nn.BatchNorm2d(c_out),
+                nn.ReLU()
+            )
+
+        self.conv_front_feat  = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0), 
+                                              nn.ReLU())
+        self.conv_front_face  = nn.Conv2d(c_out, 5, 1, 1, 0)
+        self.conv_front_score = nn.Conv2d(c_out, 1, 1, 1, 0)
+
+        self.conv_tail_feat  = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0), 
+                                              nn.ReLU())
+        self.conv_tail_face  = nn.Conv2d(c_out, 5, 1, 1, 0)
+        self.conv_tail_score = nn.Conv2d(c_out, 1, 1, 1, 0)
+
+        self.conv_left_feat  = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0), 
+                                              nn.ReLU())
+        self.conv_left_face  = nn.Conv2d(c_out, 5, 1, 1, 0)
+        self.conv_left_score = nn.Conv2d(c_out, 1, 1, 1, 0)
+
+        self.conv_right_feat  = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0), 
+                                              nn.ReLU())
+        self.conv_right_face  = nn.Conv2d(c_out, 5, 1, 1, 0)
+        self.conv_right_score = nn.Conv2d(c_out, 1, 1, 1, 0)
+        
+        self.conv_whole   = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0),
+                                          nn.ReLU(),
+                                          nn.Conv2d(c_out, 6, 1, 1, 0))
+        
+        # self.conv_heading_feat = nn.Sequential(nn.Conv2d(c_out+5*4, 256, 1, 1, 0),
+        #                                        nn.BatchNorm2d(256),
+        #                                        nn.ReLU(),
+        #                                        nn.Conv2d(256, 256, 1, 1, 0),
+        #                                        nn.BatchNorm2d(256),
+        #                                        nn.ReLU(),
+        #                                        nn.Conv2d(256, 256, 1, 1, 0),
+        #                                        nn.BatchNorm2d(256),
+        #                                        nn.ReLU())
+        if mergeBn:
+            self.conv_heading_feat = nn.Sequential(nn.Conv2d(c_out, 256, 1, 1, 0),
+                          
+                                            nn.ReLU(),
+                                            nn.Conv2d(256, 256, 1, 1, 0),
+                 
+                                            nn.ReLU(),
+                                            nn.Conv2d(256, 256, 1, 1, 0),
+                           
+                                            nn.ReLU())
+        else:
+            self.conv_heading_feat = nn.Sequential(nn.Conv2d(c_out, 256, 1, 1, 0),
+                                                nn.BatchNorm2d(256),
+                                                nn.ReLU(),
+                                                nn.Conv2d(256, 256, 1, 1, 0),
+                                                nn.BatchNorm2d(256),
+                                                nn.ReLU(),
+                                                nn.Conv2d(256, 256, 1, 1, 0),
+                                                nn.BatchNorm2d(256),
+                                                nn.ReLU())
+        self.conv_heading = nn.Conv2d(256, 8, 1, 1, 0)
+
+        self.conv_cut_cls = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0),
+                                          nn.ReLU(),
+                                          nn.Conv2d(c_out, 3, 1, 1, 0))
+        # self.conv_plate = nn.Sequential(nn.Conv2d(c_out, c_out, 1, 1, 0),
+        #                                   nn.ReLU(),
+        #                                   nn.Conv2d(c_out, 1, 1, 1, 0))
+
+        # initialize params
+        for name, m in self.named_modules():
+            if isinstance(m, nn.Conv2d):
+                if name == 'conv_heading':
+                    m.bias.data[0] = 0.0
+                    m.bias.data[1] = 0.0
+                    m.bias.data[2] = 1.0
+                    m.bias.data[3] = 0.0
+        
+    def forward(self, x):
+        bz, h, w = x.shape[0], x.shape[2], x.shape[3]
+        feat3d = self.conv_3d(x)                #4*256*40*100
+        featF = self.conv_front_feat(feat3d)
+        featT = self.conv_tail_feat(feat3d)
+        featL = self.conv_left_feat(feat3d)
+        featR = self.conv_right_feat(feat3d)
+        whole = self.conv_whole(feat3d)         #4*6*40*100
+
+        outF = self.conv_front_face(featF)      #4*5*40*100
+        outT = self.conv_tail_face(featT)
+        outL = self.conv_left_face(featL)
+        outR = self.conv_right_face(featR)
+
+        scoreF = self.conv_front_score(featF)   #4*1*40*100
+        scoreT = self.conv_tail_score(featT)
+        scoreL = self.conv_left_score(featL)
+        scoreR = self.conv_right_score(featR)
+        
+        # concat heading feat
+        # cam_params = self.cam_intrinsics.view(1, 8, 1, 1).repeat(bz, 1, h, w)    #4*8*40*100
+        # heading_feat = torch.cat([feat3d,
+        #                           outF*scoreF, 
+        #                           outT*scoreT, 
+        #                           outL*scoreL, 
+        #                           outR*scoreR
+                          
+        #                           ], dim=1)     #4*284*40*100
+        heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100
+        cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100
+        # plate = self.conv_plate(feat3d)
+        out  = torch.cat([outF,
+                          scoreF,
+                          outT,
+                          scoreT,
+                          outL,
+                          scoreL,
+                          outR,
+                          scoreR,
+                          whole,
+                          heading,
+                          cut_cls], dim=1)
+        return out
+
+class Detect3D(Detect):
+    """
+    YOLO 3D Detection head:
+    - 在标准 Detect 的基础上，新增一支 3D 回归分支 (cv4)，输出 extra_3d_dims 通道。
+    - 通道顺序约定：前 9 维为基础 3D [x,y,z,l,w,h,rotation,xc2d,yc2d]，
+      其后为 4 个面的信息（顺序：front, rear, left, right），每面 7 维 [x,y,z,xc2d,yc2d,score,is_vis]。
+    - 训练: 返回 (x, extra3d)，其中 x 为 Detect 的多层原始输出（用于 2D loss），extra3d 为 3D 通道。
+    - 推理导出(export=True): 直接将 extra3d 拼接到输出末尾，维度为 (bs, 4+nc+extra_3d_dims, N)。
+    - 常规推理(export=False): 返回 (cat_out, (raw_levels, extra3d))，便于下游 postprocess/可视化与 3D 后处理。
+    """
+
+    def __init__(self, nc: int = 80, ch: tuple = ()):
+        """
+        Args:
+            nc (int): 类别数。
+            ch (tuple): 各特征层通道数。
+            extra_3d_dims (int): 3D 回归通道数量，默认 37 = 9 + 4*7。
+        """
+        super().__init__(nc, ch)
+        self.n3d = None
+
+        # 3D 分支：与 Pose/OBB 的实现风格一致
+        # c4 = max(ch[0] // 4, self.n3d)
+        self.cv4 = nn.ModuleList(
+            head_group(c_in=x) for x in ch
+        )
+
+    def _extra3d_levels(self, feats: list[torch.Tensor]) -> list[torch.Tensor]:
+        """
+        逐层计算 3D 分支输出，返回列表：
+        - 每层张量形状： (bs, n3d, H, W)
+        """
+        x_3d = [self.cv4[i](feats[i]) for i in range(self.nl)]
+        self.n3d = x_3d[0].shape[1]
+
+        return x_3d
+
+    def _extra3d_cat(self, extra3d_levels: list[torch.Tensor]) -> torch.Tensor:
+        """
+        将逐层 3D 输出展平并拼接：
+        返回形状：(bs, n3d, sum(H_i * W_i))
+        """
+        bs = extra3d_levels[0].shape[0]
+        n3d = extra3d_levels[0].shape[1]
+        return torch.cat([e.view(bs, n3d, -1) for e in extra3d_levels], dim=2)
+
+    def forward(self, x: list[torch.Tensor]) -> torch.Tensor | tuple:
+        # 先基于原始特征 x[i] 计算 3D 分支（保持与 x 对齐的“按层”结构）
+        extra3d_levels = self._extra3d_levels(x)  # list of (bs, n3d, Hi, Wi)
+
+        # 再走 Detect 的 2D 路径
+        x_out = Detect.forward(self, x)
+
+        if self.training:
+            # 训练态保持“按层”返回，x_out 是 list[levels]（Detect 的行为）
+            # 同步返回 extra3d_levels，方便逐层用正样本索引 gather
+            return x_out, extra3d_levels
+
+        # 推理态：Detect.forward(export=False) 返回 (y_cat, raw_levels)，export=True 返回 y_cat
+        if self.export:
+            # 导出推理：把 3D 也展平 cat 后，直接拼接到 y 的通道末端
+            extra3d_cat = self._extra3d_cat(extra3d_levels)  # (bs, n3d, N)
+            return torch.cat([x_out, extra3d_cat], dim=1)
+        else:
+            # 常规推理：返回 (拼接后的y, (raw_levels, extra3d_cat))
+            y_cat, raw_levels = x_out  # y_cat: (bs, 4+nc, N)
+            extra3d_cat = self._extra3d_cat(extra3d_levels)  # (bs, n3d, N)
+            return ((y_cat, extra3d_cat), (raw_levels, extra3d_levels))
+
+    @staticmethod
+    def split_extra(extra3d: torch.Tensor, base_dims: int = 9, face_dims: int = 7, num_faces: int = 4) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        将 extra3d 拆分为基础 3D 与面信息（不更改排列，仅做通道切分）。
+        Args:
+            extra3d: (bs, n3d, N) 3D 通道输出
+            base_dims: 基础 3D 通道数，默认 9
+            face_dims: 单个面通道数，默认 7
+            num_faces: 面数量，默认 4 (front, rear, left, right)
+
+        Returns:
+            base3d: (bs, 9, N)
+            faces:  (bs, 4*7, N)  按顺序拼接的 4 个面
+        """
+        base3d = extra3d[:, 0:base_dims, :]
+        faces = extra3d[:, base_dims : base_dims + num_faces * face_dims, :]
+        return base3d, faces
 
 class Segment(Detect):
     """

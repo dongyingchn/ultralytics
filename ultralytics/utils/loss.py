@@ -215,6 +215,10 @@ class v8DetectionLoss:
         self.assigner = TaskAlignedAssigner(topk=tal_topk, num_classes=self.nc, alpha=0.5, beta=6.0)
         self.bbox_loss = BboxLoss(m.reg_max).to(device)
         self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
+        
+        self.with_3d = False
+        if hasattr(m, "cv4"):
+            self.with_3d = True
 
     def preprocess(self, targets: torch.Tensor, batch_size: int, scale_tensor: torch.Tensor) -> torch.Tensor:
         """Preprocess targets by converting to tensor format and scaling coordinates."""
@@ -245,7 +249,12 @@ class v8DetectionLoss:
     def __call__(self, preds: Any, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """Calculate the sum of the loss for box, cls and dfl multiplied by batch size."""
         loss = torch.zeros(3, device=self.device)  # box, cls, dfl
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        # feats = preds[1] if isinstance(preds, tuple) else preds
+        if self.with_3d:
+            feats = preds[0] if isinstance(preds, tuple) else preds
+        else:
+            feats = preds[1] if isinstance(preds, tuple) else preds
+
         pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * 4, self.nc), 1
         )
@@ -260,8 +269,13 @@ class v8DetectionLoss:
 
         # Targets
         targets = torch.cat((batch["batch_idx"].view(-1, 1), batch["cls"].view(-1, 1), batch["bboxes"]), 1)
+        if "ignore" in batch:  # If ignore column is provided
+            targets = torch.cat((targets, batch["ignore"].view(-1, 1)), 1)
+        else:
+            targets = torch.cat((targets, torch.zeros(targets.shape[0], 1, device=targets.device)), 1)
         targets = self.preprocess(targets, batch_size, scale_tensor=imgsz[[1, 0, 1, 0]])
-        gt_labels, gt_bboxes = targets.split((1, 4), 2)  # cls, xyxy
+        # gt_labels, gt_bboxes = targets.split((1, 4), 2)  # cls, xyxy
+        gt_labels, gt_bboxes, gt_ignore = targets.split((1, 4, 1), 2)
         mask_gt = gt_bboxes.sum(2, keepdim=True).gt_(0.0)
 
         # Pboxes
@@ -269,7 +283,7 @@ class v8DetectionLoss:
         # dfl_conf = pred_distri.view(batch_size, -1, 4, self.reg_max).detach().softmax(-1)
         # dfl_conf = (dfl_conf.amax(-1).mean(-1) + dfl_conf.amax(-1).amin(-1)) / 2
 
-        _, target_bboxes, target_scores, fg_mask, _ = self.assigner(
+        _, target_bboxes, target_scores, fg_mask, target_gt_idx = self.assigner(
             # pred_scores.detach().sigmoid() * 0.8 + dfl_conf.unsqueeze(-1) * 0.2,
             pred_scores.detach().sigmoid(),
             (pred_bboxes.detach() * stride_tensor).type(gt_bboxes.dtype),
@@ -281,12 +295,25 @@ class v8DetectionLoss:
 
         target_scores_sum = max(target_scores.sum(), 1)
 
-        # Cls loss
-        # loss[1] = self.varifocal_loss(pred_scores, target_scores, target_labels) / target_scores_sum  # VFL way
-        loss[1] = self.bce(pred_scores, target_scores.to(dtype)).sum() / target_scores_sum  # BCE
+        # ---- ignore 标签掩码构建 ----
+        # gt_ignore: [batch, n_gts, 1]
+        gt_ignore = gt_ignore.squeeze(-1)  # [batch, n_gts]
+        ignore_mask = torch.zeros_like(fg_mask, dtype=torch.bool)  # [batch, n_anchors]
+        for b in range(batch_size):
+            if gt_ignore.shape[1] == 0:
+                continue
+            idx = target_gt_idx[b][fg_mask[b]].long().clamp(0, gt_ignore.shape[1] - 1)
+            ignore_mask[b, fg_mask[b]] = gt_ignore[b, idx].bool()
+        # loss_mask: 所有 anchor，正样本且未被ignore
+        loss_mask = fg_mask & (~ignore_mask)
 
-        # Bbox loss
-        if fg_mask.sum():
+        # ---- 类别损失，所有anchor都计算，但被ignore的正样本不反传loss ----
+        bce_loss = self.bce(pred_scores, target_scores.to(dtype))  # [batch, n_anchors, n_cls]
+        bce_loss[ignore_mask] = 0.0  # 被ignore的正样本损失屏蔽
+        loss[1] = bce_loss.sum() / target_scores_sum
+
+        # ---- bbox 和 dfl 损失，仅对未被ignore的正样本计算 ----
+        if loss_mask.sum():
             loss[0], loss[2] = self.bbox_loss(
                 pred_distri,
                 pred_bboxes,
@@ -294,8 +321,24 @@ class v8DetectionLoss:
                 target_bboxes / stride_tensor,
                 target_scores,
                 target_scores_sum,
-                fg_mask,
+                loss_mask,
             )
+        # original loss
+        # # Cls loss
+        # # loss[1] = self.varifocal_loss(pred_scores, target_scores, target_labels) / target_scores_sum  # VFL way
+        # loss[1] = self.bce(pred_scores, target_scores.to(dtype)).sum() / target_scores_sum  # BCE
+
+        # # Bbox loss
+        # if fg_mask.sum():
+        #     loss[0], loss[2] = self.bbox_loss(
+        #         pred_distri,
+        #         pred_bboxes,
+        #         anchor_points,
+        #         target_bboxes / stride_tensor,
+        #         target_scores,
+        #         target_scores_sum,
+        #         fg_mask,
+        #     )
 
         loss[0] *= self.hyp.box  # box gain
         loss[1] *= self.hyp.cls  # cls gain
@@ -855,3 +898,427 @@ class TVPSegmentLoss(TVPDetectLoss):
         vp_loss = self.vp_criterion((vp_feats, pred_masks, proto), batch)
         cls_loss = vp_loss[0][2]
         return cls_loss, vp_loss[1]
+
+# ======== 3D Detection Loss (完全向量化版本，新增) ========
+class v8Detection3DLoss:
+    """
+    Criterion for YOLOv8 detection + 3D regression head (Detect3D), fully vectorized (no per-image Python loop).
+
+    训练期 Detect3D.forward 返回: (feats_levels, extra3d_levels)
+      - feats_levels: list[Tensor], 与 v8DetectionLoss 一致，用于 2D 匹配与损失
+      - extra3d_levels: list[Tensor]，各层 3D 回归通道 (B, n3d, H, W)
+
+    batch 需要包含（由数据集/Format/collate 提供）：
+      - 'batch_idx', 'cls', 'bboxes'（与 v8DetectionLoss 一致）
+      - 'labels_3d'(N,9), 'faces_3d'(N,4,7), 'has_3d_mask'(N,), 'vehicle_mask'(N,),
+        'face_vis_mask'(N,4), 'face_weight'(N,4)
+
+    超参（可在 model.args 中设置）：
+      - lambda_base3d=1.0
+      - lambda_faces_xyz=1.0
+      - lambda_faces_proj=0.5
+      - lambda_faces_vis=0.5
+      - lambda_faces_score=0.2
+      - angle_as_sincos=True
+    """
+
+    def __init__(self, model, tal_topk: int = 10):
+        device = next(model.parameters()).device
+        h = model.args
+        m = model.model[-1]  # Detect()/Detect3D()
+
+        # 2D 基础参数（同 v8DetectionLoss）
+        self.bce = nn.BCEWithLogitsLoss(reduction="none")
+        self.hyp = h
+        self.stride = m.stride
+        self.nc = m.nc
+        self.no = m.nc + m.reg_max * 4
+        self.reg_max = m.reg_max
+        self.device = device
+        self.use_dfl = m.reg_max > 1
+        self.assigner = TaskAlignedAssigner(topk=tal_topk, num_classes=self.nc, alpha=0.5, beta=6.0)
+        self.bbox_loss = BboxLoss(m.reg_max).to(device)
+        self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
+
+        # 3D 参数
+        self.n3d = getattr(m, "n3d", 37)  # 默认 Detect3D.extra_3d_dims
+        self.base_dims = 9
+        self.face_dims = 7
+        self.num_faces = 4
+
+        self.face_dims_out = 6
+
+        # 3D loss 权重
+        self.lambda_base3d = getattr(h, "lambda_base3d", 1.0)
+        self.lambda_base3d_xyz = getattr(h, "lambda_base3d_xyz", 1.0)
+        self.lambda_base3d_proj = getattr(h, "lambda_base3d_proj", 0.1)
+        self.lambda_base3d_size = getattr(h, "lambda_base3d_size", 1.0)
+        self.lambda_base3d_angle = getattr(h, "lambda_base3d_angle", 1.0)
+        
+        self.lambda_faces_xyz = getattr(h, "lambda_faces_xyz", 1.0)
+        self.lambda_faces_proj = getattr(h, "lambda_faces_proj", 0.1)
+        self.lambda_faces_size = getattr(h, "lambda_faces_size", 1.0)
+        self.lambda_faces_vis = getattr(h, "lambda_faces_vis", 1.0)
+        self.lambda_faces_score = getattr(h, "lambda_faces_score", 1.0)
+        self.angle_as_sincos = getattr(h, "angle_as_sincos", False)
+        self.angle_as_cls = getattr(h, "angle_as_cls", True)
+
+        self.klLoss = nn.KLDivLoss(reduction='sum')
+        self.L1loss_noredu = nn.L1Loss(reduction='none')
+        self.BCEloss = nn.BCEWithLogitsLoss(reduction='sum')
+
+    # ---------- 与 v8DetectionLoss 一致的工具 ----------
+    def preprocess(self, targets: torch.Tensor, batch_size: int, scale_tensor: torch.Tensor) -> torch.Tensor:
+        nl, ne = targets.shape
+        if nl == 0:
+            out = torch.zeros(batch_size, 0, ne - 1, device=self.device)
+        else:
+            i = targets[:, 0]
+            _, counts = i.unique(return_counts=True)
+            counts = counts.to(dtype=torch.int32)
+            out = torch.zeros(batch_size, counts.max(), ne - 1, device=self.device)
+            for j in range(batch_size):
+                matches = i == j
+                if n := matches.sum():
+                    out[j, :n] = targets[matches, 1:]
+            out[..., 1:5] = xywh2xyxy(out[..., 1:5].mul_(scale_tensor))
+        return out
+
+    def bbox_decode(self, anchor_points: torch.Tensor, pred_dist: torch.Tensor) -> torch.Tensor:
+        if self.use_dfl:
+            b, a, c = pred_dist.shape
+            pred_dist = pred_dist.view(b, a, 4, c // 4).softmax(3).matmul(self.proj.type(pred_dist.dtype))
+        return dist2bbox(pred_dist, anchor_points, xywh=False)
+
+    def preprocess_3d(
+        self,
+        batch_idx_flat: torch.Tensor,
+        labels_3d_flat: torch.Tensor,
+        faces_3d_flat: torch.Tensor,
+        has3d_flat: torch.Tensor,
+        vehicle_flat: torch.Tensor,
+        face_vis_flat: torch.Tensor,
+        face_weight_flat: torch.Tensor,
+        batch_size: int,
+    ):
+        """
+        将拼接的 3D GT（与 cls/bboxes 对应顺序）按图像分组并 padding。
+        返回:
+           gt3d:      (B, M, 9)
+           faces:     (B, M, 4, 7)
+           has3d:     (B, M)
+           vehicle:   (B, M)
+           face_vis:  (B, M, 4)
+           face_w:    (B, M, 4)
+        """
+        i = batch_idx_flat.view(-1)
+        if i.numel() == 0:
+            maxn = 0
+        else:
+            _, counts = i.unique(return_counts=True)
+            maxn = counts.to(dtype=torch.int32).max().item()
+
+        gt3d = torch.full((batch_size, maxn, self.base_dims), -1.0, device=self.device)
+        faces = torch.full((batch_size, maxn, self.num_faces, self.face_dims), -1.0, device=self.device)
+        has3d = torch.zeros((batch_size, maxn), dtype=torch.bool, device=self.device)
+        vehicle = torch.zeros((batch_size, maxn), dtype=torch.bool, device=self.device)
+        face_vis = torch.zeros((batch_size, maxn, self.num_faces), dtype=torch.bool, device=self.device)
+        face_w = torch.zeros((batch_size, maxn, self.num_faces), dtype=faces.dtype, device=self.device)
+
+        for j in range(batch_size):
+            matches = (i == j)
+            if not matches.any():
+                continue
+            n = int(matches.sum().item())
+            gt3d[j, :n] = labels_3d_flat[matches].to(self.device)
+            faces[j, :n] = faces_3d_flat[matches].to(self.device)
+            has3d[j, :n] = has3d_flat[matches].to(self.device)
+            vehicle[j, :n] = vehicle_flat[matches].to(self.device)
+            face_vis[j, :n] = face_vis_flat[matches].to(self.device)
+            face_w[j, :n] = face_weight_flat[matches].to(self.device)
+
+        return gt3d, faces, has3d, vehicle, face_vis, face_w
+
+    def angle_loss(self, pred_angle: torch.Tensor, gt_angle: torch.Tensor) -> torch.Tensor:
+        if pred_angle.numel() == 0:
+            return pred_angle.new_tensor(0.0)
+        if self.angle_as_sincos:
+            return F.smooth_l1_loss(torch.sin(pred_angle), torch.sin(gt_angle), reduction="mean") + \
+                   F.smooth_l1_loss(torch.cos(pred_angle), torch.cos(gt_angle), reduction="mean")
+        
+        elif self.angle_as_cls:
+            import math
+            PI = math.pi
+            gt_angle = gt_angle.view(-1,1)
+            delta_0 = gt_angle
+            delta_1 = gt_angle - PI / 2
+            delta_2 = gt_angle + PI / 2
+            ang_mask = (torch.abs(gt_angle - PI) < torch.abs(gt_angle + PI)).float()
+            delta_3 = (gt_angle - PI)*ang_mask + (gt_angle + PI)*(1-ang_mask)
+            angles = torch.cat([delta_0, delta_1, delta_2, delta_3], dim=1)
+            # angle classification
+            ang_cls = (PI*0.5 - torch.abs(angles)) / (PI*0.5)
+            ang_cls[ang_cls < 0] = 0
+            assert torch.sum(torch.sum(ang_cls, dim=1) > 1.001) == 0
+            assert torch.sum(torch.sum(ang_cls, dim=1) < 0.999) == 0
+            gt_angle_ = torch.cat([ang_cls, angles], dim=1)
+
+            pred_angle_prob = torch.log_softmax(pred_angle[:, :4], dim=1)
+            l_angle_cls = self.klLoss(pred_angle_prob, gt_angle_[:, :4])
+
+            valid_mask = torch.abs(gt_angle_[:, 4:]) < (PI*0.5)
+            yaw_loss = self.L1loss_noredu(pred_angle[:, 4:].tanh()*(PI*0.5), gt_angle_[:, 4:]) * valid_mask
+            l_angle_reg = torch.sum(yaw_loss)
+
+            l_angle = l_angle_cls / pred_angle.shape[0] + l_angle_reg / valid_mask.sum().clamp_min(1.0)
+
+            return l_angle
+        else:
+            return F.smooth_l1_loss(pred_angle, gt_angle, reduction="mean")
+
+    def cutcls_loss(self, pred_cutcls: torch.Tensor, gt_faces: torch.Tensor) -> torch.Tensor:
+        f_c = torch.sum(gt_faces[:, 0, [0,1,2,4,5]],dim=1)==-4
+        t_c = torch.sum(gt_faces[:, 1, [0,1,2,4,5]],dim=1)==-4
+        l_c = torch.sum(gt_faces[:, 2, [0,1,2,4,5]],dim=1)==-4
+        r_c = torch.sum(gt_faces[:, 3, [0,1,2,4,5]],dim=1)==-4
+
+        cut_cls_label = torch.zeros_like(f_c).float()
+        cut_cls_label[torch.where(t_c & l_c & r_c)] = 1  ##cut_in 
+        cut_cls_label[torch.where(f_c & l_c & r_c)] = 2  ##cut_out
+
+        gt_cutcls = torch.full_like(pred_cutcls, 0)
+        gt_cutcls[torch.arange(len(cut_cls_label)), cut_cls_label.long()] = 1.0  ###### tcls[i]#####
+
+        l_cutcls = self.BCEloss(pred_cutcls, gt_cutcls)
+        return l_cutcls
+
+    # ---------- 主计算 ----------
+    def __call__(self, preds: Any, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        返回:
+          total_loss * batch_size, loss_vec.detach()
+        其中 loss_vec = [box, cls, dfl, base3d, faces]
+        """
+        # 解析 Detect3D 训练输出
+        # assert isinstance(preds, (list, tuple)) and isinstance(preds[0], list), \
+        #     "v8Detection3DLossVectorized expects Detect3D training outputs: (feats_levels, extra3d_levels)"
+
+        # training
+        if isinstance(preds, (list, tuple)) and isinstance(preds[0], list):
+            feats, extra3d_levels = preds
+        # eval
+        elif isinstance(preds, (list, tuple)) and isinstance(preds[1], tuple):
+            feats, extra3d_levels = preds[1]
+        else:
+            raise TypeError(
+                "v8Detection3DLossVectorized expects Detect3D training outputs: (feats_levels, extra3d_levels)"
+            )
+
+        loss_vec = torch.zeros(6, device=self.device)  # box, cls, dfl, base3d, faces, cutcls
+
+        # 2D 展平 (与 v8DetectionLoss 同)
+        pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
+            (self.reg_max * 4, self.nc), 1
+        )
+        pred_scores = pred_scores.permute(0, 2, 1).contiguous()  # (B, N, nc)
+        pred_distri = pred_distri.permute(0, 2, 1).contiguous()  # (B, N, reg*4)
+
+        # 3D 展平 (B, N, n3d)
+        bs = feats[0].shape[0]
+        pred_extra3d = torch.cat([e.view(bs, self.n3d, -1) for e in extra3d_levels], 2).permute(0, 2, 1).contiguous()
+
+        dtype = pred_scores.dtype
+        batch_size = pred_scores.shape[0]
+        imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]
+        anchor_points, stride_tensor = make_anchors(feats, self.stride, 0.5)
+
+        # Targets 与匹配
+        targets = torch.cat((batch["batch_idx"].view(-1, 1), batch["cls"].view(-1, 1), batch["bboxes"]), 1)
+        targets = self.preprocess(targets, batch_size, scale_tensor=imgsz[[1, 0, 1, 0]])
+        gt_labels, gt_bboxes = targets.split((1, 4), 2)  # (B,M,1), (B,M,4)
+        mask_gt = gt_bboxes.sum(2, keepdim=True).gt_(0.0)
+
+        pred_bboxes = self.bbox_decode(anchor_points, pred_distri)  # (B, N, 4)
+
+        _, target_bboxes, target_scores, fg_mask, target_gt_idx = self.assigner(
+            pred_scores.detach().sigmoid(),
+            (pred_bboxes.detach() * stride_tensor).type(gt_bboxes.dtype),
+            anchor_points * stride_tensor,
+            gt_labels,
+            gt_bboxes,
+            mask_gt,
+        )
+        target_scores_sum = max(target_scores.sum(), 1)
+
+        # 2D Cls
+        loss_vec[1] = self.bce(pred_scores, target_scores.to(dtype)).sum() / target_scores_sum
+
+        # 2D Box + DFL
+        if fg_mask.sum():
+            l_iou, l_dfl = self.bbox_loss(
+                pred_distri,
+                pred_bboxes,
+                anchor_points,
+                target_bboxes / stride_tensor,
+                target_scores,
+                target_scores_sum,
+                fg_mask,
+            )
+            loss_vec[0] = l_iou
+            loss_vec[2] = l_dfl
+
+        # ---------------- 3D GT 预处理（按图像分组 + padding） ----------------
+        labels_3d_flat = batch.get("labels_3d", torch.zeros(0, self.base_dims, device=self.device)).to(self.device)
+        faces_3d_flat = batch.get("faces_3d", torch.zeros(0, self.num_faces, self.face_dims, device=self.device)).to(self.device)
+        has3d_flat = batch.get("has_3d_mask", torch.zeros(0, dtype=torch.bool, device=self.device)).to(self.device)
+        vehicle_flat = batch.get("vehicle_mask", torch.zeros(0, dtype=torch.bool, device=self.device)).to(self.device)
+        face_vis_flat = batch.get("face_vis_mask", torch.zeros(0, self.num_faces, dtype=torch.bool, device=self.device)).to(self.device)
+        face_weight_flat = batch.get("face_weight", torch.zeros(0, self.num_faces, device=self.device)).to(self.device)
+
+        gt3d, faces3d, has3d, vehicle, face_vis, face_w = self.preprocess_3d(
+            batch["batch_idx"].to(self.device),
+            labels_3d_flat,
+            faces_3d_flat,
+            has3d_flat,
+            vehicle_flat,
+            face_vis_flat,
+            face_weight_flat,
+            batch_size,
+        )
+
+        # gt3d: x3d_ori: 0, y3d_ori: 1, z3d_ori: 2, 13d: 3, h3d: 4, w3d: 5, rot_y: 6, xc_ori: 7, yc_ori: 8,
+        # faces3d: x3d: 0, y3d: 1, z3d: 2, xc: 3, yc: 4, score: 5, is occ: 6,
+
+        # ---------------- 完全向量化：一次性在所有正样本上 gather ----------------
+        pos = fg_mask.nonzero(as_tuple=False)  # (P, 2) with [b_idx, a_idx]
+        P = pos.shape[0]
+
+        if P == 0:
+            # 保持计算图（避免DDP未用梯度报错的风险）
+            loss_vec[3] = loss_vec[3] + (pred_extra3d * 0).sum() * 0.0
+            loss_vec[4] = loss_vec[4] + (pred_extra3d * 0).sum() * 0.0
+        else:
+            b_idx, a_idx = pos[:, 0], pos[:, 1]
+            # 正样本对应的 GT 索引（图内编号）
+            gi = target_gt_idx[b_idx, a_idx]  # (P,)
+
+            # 正样本 3D 预测 (P, n3d)
+            pred3d_pos = pred_extra3d[b_idx, a_idx]  # (P, n3d)
+
+            # 分割为 基础3D + 车辆4面
+            pred_faces = pred3d_pos[:, :self.num_faces*self.face_dims_out].view(-1, self.num_faces, self.face_dims_out)  # (P, 4, 6)
+            pred_base = pred3d_pos[:, self.num_faces*self.face_dims_out:]                          # (P, 6+8+3)
+
+            # GT 3D（按图像分组后，使用 (b_idx, gi) gather）
+            gt_base_pos = gt3d[b_idx, gi]             # (P, 9)
+            gt_faces_pos = faces3d[b_idx, gi]         # (P, 4, 7)
+            has3d_pos = has3d[b_idx, gi]              # (P,)
+            vehicle_pos = vehicle[b_idx, gi]          # (P,)
+            face_vis_pos = face_vis[b_idx, gi]        # (P, 4)
+            face_w_pos = face_w[b_idx, gi]            # (P, 4)
+
+            ap_px = (anchor_points[a_idx] * stride_tensor[a_idx]).to(pred3d_pos.dtype)       # (P, 2) 像素
+            st_pos = stride_tensor[a_idx].to(pred3d_pos.dtype) 
+
+            # ---- 基础3D：仅在 has3d 上监督（稳定均值化）
+            m = has3d_pos
+            if m.any():
+                m_sum = m.sum().clamp_min(1)
+                # xyz, lwh, proj 以元素均值统计；旋转使用角度损失
+
+                gt_base_pos_norm = torch.zeros_like(gt_base_pos)
+                gt_base_pos_norm[m, 0] = gt_base_pos[m, 0] / 35.0
+                gt_base_pos_norm[m, 1] = gt_base_pos[m, 1] / 5.0
+                gt_base_pos_norm[m, 2] = (gt_base_pos[m, 2] - 40) / 40
+                gt_base_pos_norm[m, 3:6] = gt_base_pos[m, 3:6] / 18.0
+
+                l_xyz = F.smooth_l1_loss(pred_base[m, 0], gt_base_pos_norm[m, 2], reduction="sum") / (m_sum * 3)
+                
+                gt_proj_px   = gt_base_pos[:, 7:9]                  # (P,2) 像素GT
+                gt_proj_off  = (gt_proj_px - ap_px) / st_pos        # (P,2) 归一到 cell
+                l_proj = F.smooth_l1_loss(pred_base[m, 1:3].tanh()*6, gt_proj_off[m], reduction="sum") / (m_sum * 2)
+
+                l_lwh = F.smooth_l1_loss(pred_base[m, 3:6], gt_base_pos_norm[m, 3:6], reduction="sum") / (m_sum * 3)
+
+                l_rot = self.angle_loss(pred_base[m, 6:14], gt_base_pos[m, 6])
+                
+                base3d_loss = self.lambda_base3d_xyz*l_xyz + \
+                            self.lambda_base3d_proj*l_proj + \
+                            self.lambda_base3d_size*l_lwh + \
+                            self.lambda_base3d_angle*l_rot
+            
+            else:
+                base3d_loss = torch.zeros(1, device=pred3d_pos.device).sum()
+
+            # ---- 车辆 4 面：仅在 vehicle 上；几何/投影只监督可见(is_vis)面并以 score 作为权重
+            vm = vehicle_pos
+            if vm.any():
+                pv = vm.sum().item()
+                p_faces = pred_faces[vm]        # (Pv, 4, 7)
+                g_faces = gt_faces_pos[vm]      # (Pv, 4, 7)
+                vis = face_vis_pos[vm].float()  # (Pv, 4)
+                w = face_w_pos[vm]              # (Pv, 4)
+
+                w[w>0.3] = 1.0
+                w[w<=0.3] = 0.0
+
+                valid_face = vis * w
+
+                gt_base = gt_base_pos[vm]  # (Pv, 9)
+                gt_faces_with_size = torch.zeros((g_faces.shape[0], g_faces.shape[1], 9), device=g_faces.device, dtype=g_faces.dtype)
+                gt_faces_with_size[:, :, :7] = g_faces
+                gt_faces_with_size[:, :2, 7:9] = gt_base[:, 4:6].unsqueeze(1).repeat(1, 2, 1)
+                gt_faces_with_size[:, 2:, 7:9] = gt_base[:, 3:5].unsqueeze(1).repeat(1, 2, 1)
+
+                # xyz (Pv,4,3) -> mean over last -> (Pv,4)
+                l_xyz_face = F.smooth_l1_loss(p_faces[:, :, 0], g_faces[:, :, 2]/18.0, reduction="none")
+                
+                # proj (Pv,4,2) -> (Pv,4)
+                gt_proj_face_px = gt_faces_pos[:, :, 3:5]                                              # (P,4,2) 像素GT
+                gt_proj_face_off = (gt_proj_face_px - ap_px[:, None, :]) / st_pos[:, None, :]          # (P,4,2)
+                l_proj_face = F.smooth_l1_loss(p_faces[:, :, 1:3].tanh()*6, gt_proj_face_off[vm], reduction="none").mean(-1)
+                
+                gt_faces_with_size_norm = gt_faces_with_size[:, :, 7:9] / 18.0
+                l_size_face = F.smooth_l1_loss(p_faces[:, :, 3:5], gt_faces_with_size_norm, reduction="none").mean(-1)
+
+                # 可见性 BCE（所有面）
+                l_vis_face = F.binary_cross_entropy_with_logits(p_faces[:, :, 5], g_faces[:, :, 6], reduction="none")
+
+                # score 回归（仅可见）
+                # l_score_face = F.smooth_l1_loss(torch.sigmoid(p_faces[:, :, 5]), g_faces[:, :, 5], reduction="none")
+
+                l_cutcls = self.cutcls_loss(pred_base[vm, 14:], g_faces)
+                l_cutcls = l_cutcls / pv
+
+                # 可见面计数（用于归一化）
+                denom = valid_face.sum().clamp_min(1.0)
+
+                faces_xyz = (l_xyz_face * valid_face).sum() / denom
+                faces_proj = (l_proj_face * valid_face).sum() / denom
+                faces_size = (l_size_face * valid_face).sum() / denom
+                faces_vis = (l_vis_face * valid_face).sum() / denom
+                # faces_score = (l_score_face * vis).sum() / denom
+
+                faces_loss = (
+                    self.lambda_faces_xyz * faces_xyz +
+                    self.lambda_faces_proj * faces_proj +
+                    self.lambda_faces_size * faces_size + 
+                    self.lambda_faces_vis * faces_vis
+                    # self.lambda_faces_score * faces_score
+                )
+            else:
+                faces_loss = torch.zeros(1, device=pred3d_pos.device).sum()
+                l_cutcls = torch.zeros(1, device=pred3d_pos.device).sum()
+
+            loss_vec[3] = self.lambda_base3d * base3d_loss
+            loss_vec[4] = faces_loss
+            loss_vec[5] = l_cutcls
+
+        # 2D gains
+        loss_vec[0] *= self.hyp.box
+        loss_vec[1] *= self.hyp.cls
+        loss_vec[2] *= self.hyp.dfl
+
+        total_loss = loss_vec.sum()
+        return total_loss * batch_size, loss_vec.detach()
+# ======== 3D Detection Loss (完全向量化版本) 结束 ========

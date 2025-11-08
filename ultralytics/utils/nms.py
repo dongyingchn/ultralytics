@@ -61,6 +61,8 @@ def non_max_suppression(
     assert 0 <= iou_thres <= 1, f"Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0"
     if isinstance(prediction, (list, tuple)):  # YOLOv8 model in validation model, output = (inference_out, loss_out)
         prediction = prediction[0]  # select only inference output
+    if isinstance(prediction, (list, tuple)):  # 3d case
+        prediction, prediction_3D = prediction[0], prediction[1]
     if classes is not None:
         classes = torch.tensor(classes, device=prediction.device)
 

@@ -207,6 +207,7 @@ def verify_image_label(args: tuple) -> list:
                     segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
                     lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
                 lb = np.array(lb, dtype=np.float32)
+                lb = lb[:,:-1]
             if nl := len(lb):
                 if keypoint:
                     assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
@@ -248,6 +249,258 @@ def verify_image_label(args: tuple) -> list:
         msg = f"{prefix}{im_file}: ignoring corrupt image/label: {e}"
         return [None, None, None, None, None, nm, nf, ne, nc, msg]
 
+def verify_image_label_with_ignore(args: tuple) -> list:
+    """Verify one image-label pair, now supports ignore column in label files."""
+    im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls = args
+    # Number (missing, found, empty, corrupt), message, segments, keypoints
+    nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, "", [], None
+    ignore = None  # 新增ignore标签
+
+    try:
+        # Verify images
+        im = Image.open(im_file)
+        im.verify()  # PIL verify
+        shape = exif_size(im)  # image size
+        shape = (shape[1], shape[0])  # hw
+        assert (shape[0] > 9) & (shape[1] > 9), f"image size {shape} <10 pixels"
+        assert im.format.lower() in IMG_FORMATS, f"invalid image format {im.format}. {FORMATS_HELP_MSG}"
+        if im.format.lower() in {"jpg", "jpeg"}:
+            with open(im_file, "rb") as f:
+                f.seek(-2, 2)
+                if f.read() != b"\xff\xd9":  # corrupt JPEG
+                    ImageOps.exif_transpose(Image.open(im_file)).save(im_file, "JPEG", subsampling=0, quality=100)
+                    msg = f"{prefix}{im_file}: corrupt JPEG restored and saved"
+
+        # Verify labels
+        if os.path.isfile(lb_file):
+            nf = 1  # label found
+            with open(lb_file, encoding="utf-8") as f:
+                lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
+                if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
+                    classes = np.array([x[0] for x in lb], dtype=np.float32)
+                    segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
+                    lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
+                lb = np.array(lb, dtype=np.float32)
+
+            if nl := len(lb):
+                if keypoint:
+                    assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
+                    points = lb[:, 5:].reshape(-1, ndim)[:, :2]
+                else:
+                    # === ignore标签适配 ===
+                    if lb.shape[1] == 5:
+                        ignore = np.zeros((nl, 1), dtype=np.float32)
+                    elif lb.shape[1] == 6:
+                        ignore = lb[:, 5:6]
+                        # 当前的标签中，1表示正样本，-1表示ignore，转化为0表示正样本，1表示ignore
+                        ignore = np.where(ignore == -1, 1, 0)
+                        lb = lb[:, :5]
+                    else:
+                        raise ValueError(f"labels require 5 (or 6 with ignore) columns, {lb.shape[1]} columns detected")
+                    points = lb[:, 1:]
+
+                # Coordinate points check with 1% tolerance
+                assert points.max() <= 1.01, f"non-normalized or out of bounds coordinates {points[points > 1.01]}"
+                assert lb.min() >= -0.01, f"negative class labels or coordinate {lb[lb < -0.01]}"
+
+                # All labels
+                max_cls = 0 if single_cls else lb[:, 0].max()  # max label count
+                assert max_cls < num_cls, (
+                    f"Label class {int(max_cls)} exceeds dataset class count {num_cls}. "
+                    f"Possible class labels are 0-{num_cls - 1}"
+                )
+                _, i = np.unique(lb, axis=0, return_index=True)
+                if len(i) < nl:  # duplicate row check
+                    lb = lb[i]  # remove duplicates
+                    if segments:
+                        segments = [segments[x] for x in i]
+                    if ignore is not None:
+                        ignore = ignore[i]
+                    msg = f"{prefix}{im_file}: {nl - len(i)} duplicate labels removed"
+            else:
+                ne = 1  # label empty
+                lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+                ignore = np.zeros((0, 1), dtype=np.float32)
+        else:
+            nm = 1  # label missing
+            lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+            ignore = np.zeros((0, 1), dtype=np.float32)
+
+        if keypoint:
+            keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
+            if ndim == 2:
+                kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
+                keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
+        lb = lb[:, :5]
+
+        # 返回 ignore
+        return im_file, lb, shape, segments, keypoints, ignore, nm, nf, ne, nc, msg
+    except Exception as e:
+        nc = 1
+        msg = f"{prefix}{im_file}: ignoring corrupt image/label: {e}"
+        return [None, None, None, None, None, None, nm, nf, ne, nc, msg]
+
+def verify_image_label_with_3D(args: tuple) -> list:
+    """Verify one image-label pair.
+    新增：当 args 最后一个布尔位为 True 时，解析 3D 标签并在返回值中追加 extra3d 字典（第 11 个返回项）。
+    """
+    # 兼容旧/新参数长度：旧为 8，新为 9（多了 parse_3d）
+    if len(args) == 8:
+        im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls = args
+        parse_3d = False
+    else:
+        im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls, parse_3d = args
+
+    # Number (missing, found, empty, corrupt), message, segments, keypoints
+    nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, "", [], None
+    extra3d = None
+    try:
+        # Verify images
+        im = Image.open(im_file)
+        im.verify()  # PIL verify
+        shape = exif_size(im)  # image size
+        shape = (shape[1], shape[0])  # hw
+        assert (shape[0] > 9) & (shape[1] > 9), f"image size {shape} <10 pixels"
+        assert im.format.lower() in IMG_FORMATS, f"invalid image format {im.format}. {FORMATS_HELP_MSG}"
+        if im.format.lower() in {"jpg", "jpeg"}:
+            with open(im_file, "rb") as f:
+                f.seek(-2, 2)
+                if f.read() != b"\xff\xd9":  # corrupt JPEG
+                    ImageOps.exif_transpose(Image.open(im_file)).save(im_file, "JPEG", subsampling=0, quality=100)
+                    msg = f"{prefix}{im_file}: corrupt JPEG restored and saved"
+
+        # Verify labels
+        if os.path.isfile(lb_file):
+            nf = 1  # label found
+            with open(lb_file, encoding="utf-8") as f:
+                raw = [x.split() for x in f.read().strip().splitlines() if len(x)]
+            # 判断是否 3D 格式（5/14/42 列混合）
+            is_3d_format = (
+                not keypoint
+                and parse_3d
+                and all(len(x) in {6, 18, 50} for x in raw)
+            )
+
+            if not keypoint and (not is_3d_format) and any(len(x) > 6 for x in raw):  # is segment
+                classes = np.array([x[0] for x in raw], dtype=np.float32)
+                segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in raw]  # (cls, xy1...)
+                lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
+            else:
+                lb = np.array([[float(t) for t in x[:5]] for x in raw], dtype=np.float32) if len(raw) else np.zeros((0, 5), dtype=np.float32)
+
+            if nl := len(lb):
+                if keypoint:
+                    assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
+                    points = lb[:, 5:].reshape(-1, ndim)[:, :2]
+                else:
+                    assert lb.shape[1] == 5, f"labels require 5 columns, {lb.shape[1]} columns detected"
+                    points = lb[:, 1:]
+                # Coordinate points check with 1% tolerance
+                assert points.max() <= 1.01, f"non-normalized or out of bounds coordinates {points[points > 1.01]}"
+                assert lb.min() >= -0.01, f"negative class labels or coordinate {lb[lb < -0.01]}"
+
+                # All labels
+                max_cls = 0 if single_cls else lb[:, 0].max()  # max label count
+                assert max_cls < num_cls, (
+                    f"Label class {int(max_cls)} exceeds dataset class count {num_cls}. "
+                    f"Possible class labels are 0-{num_cls - 1}"
+                )
+                # 去重基于 2D 行
+                _, i = np.unique(lb, axis=0, return_index=True)
+                if len(i) < nl:  # duplicate row check
+                    lb = lb[i]  # remove duplicates
+                    if segments:
+                        segments = [segments[x] for x in i]
+                    msg = f"{prefix}{im_file}: {nl - len(i)} duplicate labels removed"
+
+                # 解析 3D（仅当 is_3d_format=True）
+                if is_3d_format:
+                    n = lb.shape[0]
+                    labels_3d = np.full((n, 9), -1.0, dtype=np.float32)
+                    faces_3d = np.full((n, 4, 7), -1.0, dtype=np.float32)
+                    has_3d_mask = np.zeros((n,), dtype=bool)
+                    vehicle_mask = np.zeros((n,), dtype=bool)
+                    face_vis_mask = np.zeros((n, 4), dtype=bool)
+                    face_weight = np.zeros((n, 4), dtype=np.float32)
+
+                    # 注意：此处 raw 与 lb 对应一一行，需应用相同的去重索引 i
+                    raw_arr = [raw[idx] for idx in i] if len(i) < nl else raw
+
+                    for j, toks in enumerate(raw_arr):
+                        cls_id = int(float(toks[0]))
+                        L = len(toks)
+                        # 行人/两轮车/骑行者：14 列，车辆：42 列，其余仅 2D：5 列
+                        if L == 18 and cls_id in {1, 2, 3}:
+                            base = np.array([float(x) for x in toks[5:14]], dtype=np.float32)
+                            
+                            labels_3d[j] = base
+                            has_3d_mask[j] = True
+                        elif L == 50 and cls_id == 0:
+                            base = np.array([float(x) for x in toks[5:14]], dtype=np.float32)
+                            faces_flat = np.array([float(x) for x in toks[18:50]], dtype=np.float32)
+                            faces_flat_tmp = faces_flat.reshape(4, 8)
+                            # 去掉第4列
+                            faces = np.delete(faces_flat_tmp, 3, axis=1)
+                            # 检查faces是不是4x7
+                            assert faces.shape == (4, 7), "faces shape is not 4x7"
+                            
+                            labels_3d[j] = base
+                            faces_3d[j] = faces
+                            has_3d_mask[j] = True
+                            vehicle_mask[j] = True
+                            scores = faces[:, 5]
+                            is_vis = faces[:, 6]
+                            vis = (scores > 0.0) & (is_vis == 1.0)
+                            face_vis_mask[j] = vis
+                            face_weight[j] = np.where(vis, scores, 0.0).astype(np.float32)
+
+                    extra3d = {
+                        "labels_3d": labels_3d,
+                        "faces_3d": faces_3d,
+                        "has_3d_mask": has_3d_mask,
+                        "vehicle_mask": vehicle_mask,
+                        "face_vis_mask": face_vis_mask,
+                        "face_weight": face_weight,
+                    }
+
+            else:
+                ne = 1  # label empty
+                lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+                if parse_3d:
+                    extra3d = {
+                        "labels_3d": np.zeros((0, 9), dtype=np.float32),
+                        "faces_3d": np.zeros((0, 4, 7), dtype=np.float32),
+                        "has_3d_mask": np.zeros((0,), dtype=bool),
+                        "vehicle_mask": np.zeros((0,), dtype=bool),
+                        "face_vis_mask": np.zeros((0, 4), dtype=bool),
+                        "face_weight": np.zeros((0, 4), dtype=np.float32),
+                    }
+        else:
+            nm = 1  # label missing
+            lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+            if parse_3d:
+                extra3d = {
+                    "labels_3d": np.zeros((0, 9), dtype=np.float32),
+                    "faces_3d": np.zeros((0, 4, 7), dtype=np.float32),
+                    "has_3d_mask": np.zeros((0,), dtype=bool),
+                    "vehicle_mask": np.zeros((0,), dtype=bool),
+                    "face_vis_mask": np.zeros((0, 4), dtype=bool),
+                    "face_weight": np.zeros((0, 4), dtype=np.float32),
+                }
+        if keypoint and lb.size:
+            keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
+            if ndim == 2:
+                kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
+                keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
+        lb = lb[:, :5]
+
+        assert len(lb) == (len(extra3d["labels_3d"]) if extra3d is not None else len(lb)), f"2D and 3D label counts do not match in {lb_file}"
+
+        return im_file, lb, shape, segments, keypoints, nm, nf, ne, nc, msg, extra3d
+    except Exception as e:
+        nc = 1
+        msg = f"{prefix}{im_file}: ignoring corrupt image/label: {e}"
+        return [None, None, None, None, None, nm, nf, ne, nc, msg, None]
 
 def visualize_image_annotations(image_path: str, txt_path: str, label_map: dict[int, str]):
     """

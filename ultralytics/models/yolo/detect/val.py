@@ -101,6 +101,8 @@ class DetectionValidator(BaseValidator):
         self.metrics.names = model.names
         self.confusion_matrix = ConfusionMatrix(names=model.names, save_matches=self.args.plots and self.args.visualize)
 
+        self.enable_3d = getattr(model, "enable_3d", False)
+
     def get_desc(self) -> str:
         """Return a formatted string summarizing class metrics of YOLO model."""
         return ("%22s" + "%11s" * 6) % ("Class", "Images", "Instances", "Box(P", "R", "mAP50", "mAP50-95)")
@@ -146,6 +148,14 @@ class DetectionValidator(BaseValidator):
         ori_shape = batch["ori_shape"][si]
         imgsz = batch["img"].shape[2:]
         ratio_pad = batch["ratio_pad"][si]
+        # === ignore处理：只保留未ignore的真值框 ===
+        if "ignore" in batch:
+            ignore = batch["ignore"][idx].squeeze(-1)
+            # print("VAL IGNORE DEBUG:", ignore)  # 打印出来看看
+            not_ignore = (ignore == 0)
+            # print("VAL NOT_IGNORE DEBUG:", not_ignore, not_ignore.sum())
+            cls = cls[not_ignore]
+            bbox = bbox[not_ignore]
         if cls.shape[0]:
             bbox = ops.xywh2xyxy(bbox) * torch.tensor(imgsz, device=self.device)[[1, 0, 1, 0]]  # target boxes
         return {

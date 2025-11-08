@@ -809,6 +809,9 @@ class Mosaic(BaseMixTransform):
         labels["instances"].convert_bbox(format="xyxy")
         labels["instances"].denormalize(nw, nh)
         labels["instances"].add_padding(padw, padh)
+        # === ignore字段同步处理 ===
+        if "ignore" in labels:
+            labels["ignore"] = np.copy(labels["ignore"])
         return labels
 
     def _cat_labels(self, mosaic_labels: list[dict[str, Any]]) -> dict[str, Any]:
@@ -842,10 +845,13 @@ class Mosaic(BaseMixTransform):
             return {}
         cls = []
         instances = []
+        ignore = []
         imgsz = self.imgsz * 2  # mosaic imgsz
         for labels in mosaic_labels:
             cls.append(labels["cls"])
             instances.append(labels["instances"])
+            if "ignore" in labels:
+                ignore.append(labels["ignore"])
         # Final labels
         final_labels = {
             "im_file": mosaic_labels[0]["im_file"],
@@ -855,9 +861,13 @@ class Mosaic(BaseMixTransform):
             "instances": Instances.concatenate(instances, axis=0),
             "mosaic_border": self.border,
         }
+        if ignore:
+            final_labels["ignore"] = np.concatenate(ignore, 0)
         final_labels["instances"].clip(imgsz, imgsz)
         good = final_labels["instances"].remove_zero_area_boxes()
         final_labels["cls"] = final_labels["cls"][good]
+        if "ignore" in final_labels:
+            final_labels["ignore"] = final_labels["ignore"][good]
         if "texts" in mosaic_labels[0]:
             final_labels["texts"] = mosaic_labels[0]["texts"]
         return final_labels
@@ -926,6 +936,13 @@ class MixUp(BaseMixTransform):
         labels["img"] = (labels["img"] * r + labels2["img"] * (1 - r)).astype(np.uint8)
         labels["instances"] = Instances.concatenate([labels["instances"], labels2["instances"]], axis=0)
         labels["cls"] = np.concatenate([labels["cls"], labels2["cls"]], 0)
+        # === ignore字段拼接 ===
+        if "ignore" in labels and "ignore" in labels2:
+            labels["ignore"] = np.concatenate([labels["ignore"], labels2["ignore"]], 0)
+        elif "ignore" in labels:
+            labels["ignore"] = np.concatenate([labels["ignore"], np.zeros_like(labels2["cls"])], 0)
+        elif "ignore" in labels2:
+            labels["ignore"] = np.concatenate([np.zeros_like(labels["cls"]), labels2["ignore"]], 0)
         return labels
 
 
@@ -1044,6 +1061,13 @@ class CutMix(BaseMixTransform):
 
         labels["cls"] = np.concatenate([labels["cls"], labels2["cls"][indexes2]], axis=0)
         labels["instances"] = Instances.concatenate([labels["instances"], instances2], axis=0)
+        # === ignore字段拼接 ===
+        if "ignore" in labels and "ignore" in labels2:
+            labels["ignore"] = np.concatenate([labels["ignore"], labels2["ignore"][indexes2]], axis=0)
+        elif "ignore" in labels:
+            labels["ignore"] = np.concatenate([labels["ignore"], np.zeros((len(indexes2), 1), dtype=labels["ignore"].dtype)], axis=0)
+        elif "ignore" in labels2:
+            labels["ignore"] = np.concatenate([np.zeros((len(labels["cls"]), 1), dtype=labels2["ignore"].dtype), labels2["ignore"][indexes2]], axis=0)
         return labels
 
 
@@ -1363,6 +1387,18 @@ class RandomPerspective:
         labels["cls"] = cls[i]
         labels["img"] = img
         labels["resized_shape"] = img.shape[:2]
+        # === ignore标签同步过滤 ===
+        if "ignore" in labels:
+            labels["ignore"] = labels["ignore"][i]
+        
+        if "labels_3d" in labels:
+            labels["labels_3d"] = labels["labels_3d"][i]
+            labels["faces_3d"] = labels["faces_3d"][i]
+            labels["has_3d_mask"] = labels["has_3d_mask"][i]
+            labels["vehicle_mask"] = labels["vehicle_mask"][i]
+            labels["face_vis_mask"] = labels["face_vis_mask"][i]
+            labels["face_weight"] = labels["face_weight"][i]
+
         return labels
 
     @staticmethod
@@ -1587,6 +1623,9 @@ class RandomFlip:
                 instances.keypoints = np.ascontiguousarray(instances.keypoints[:, self.flip_idx, :])
         labels["img"] = np.ascontiguousarray(img)
         labels["instances"] = instances
+        # === ignore字段同步（flip不改变顺序，只需保留） ===
+        if "ignore" in labels:
+            labels["ignore"] = np.copy(labels["ignore"])
         return labels
 
 
@@ -1735,6 +1774,12 @@ class LetterBox:
             labels["ratio_pad"] = (labels["ratio_pad"], (left, top))  # for evaluation
 
         if len(labels):
+            # ==== 新增：把 LetterBox 的几何信息放到 labels，供 _update_labels 使用 ====
+            labels["_lb_new_shape"] = new_shape              # (H_new, W_new)
+            labels["_lb_new_unpad"] = new_unpad             # (W_unpad, H_unpad) 注意顺序与上文一致
+            labels["_lb_pad"] = (left, top)                 # 左、上 padding 像素
+            # ======================================================================
+
             labels = self._update_labels(labels, ratio, left, top)
             labels["img"] = img
             labels["resized_shape"] = new_shape
@@ -1770,6 +1815,34 @@ class LetterBox:
         labels["instances"].denormalize(*labels["img"].shape[:2][::-1])
         labels["instances"].scale(*ratio)
         labels["instances"].add_padding(padw, padh)
+        # === ignore字段同步（与bbox顺序一致） ===
+        if "ignore" in labels:
+            labels["ignore"] = np.copy(labels["ignore"])
+
+        # ==== 新增：更新 3D 投影点 ====
+        new_shape = labels.pop("_lb_new_shape", None)   # (H_new, W_new)
+        new_unpad = labels.pop("_lb_new_unpad", None)   # (W_unpad, H_unpad) 注意它在 LetterBox 中是 (width, height)
+        lb_pad = labels.pop("_lb_pad", (padw, padh))    # (left, top)
+        if new_shape is not None and new_unpad is not None:
+            H_new, W_new = new_shape
+            W_unpad, H_unpad = new_unpad  # 与上文保持一致
+            left, top = lb_pad
+
+            # labels_3d: (n, 9) -> [ ..., xc_3d, yc_3d ]
+            if "labels_3d" in labels and labels["labels_3d"] is not None and len(labels["labels_3d"]):
+                proj = labels["labels_3d"][:, 7:9].astype(np.float32, copy=True)  # 归一化到原图
+                # 反归一化到原图像素 -> 缩放到unpad -> 加padding -> 归一化到新图
+                proj[:, 0] = (proj[:, 0] * W_unpad + left) / float(W_new)
+                proj[:, 1] = (proj[:, 1] * H_unpad + top) / float(H_new)
+                labels["labels_3d"][:, 7:9] = proj
+
+            # faces_3d: (n, 4, 7) -> [..., xc_3d_face, yc_3d_face, score, is_vis]
+            if "faces_3d" in labels and labels["faces_3d"] is not None and len(labels["faces_3d"]):
+                projf = labels["faces_3d"][:, :, 3:5].astype(np.float32, copy=True)
+                projf[:, :, 0] = (projf[:, :, 0] * W_unpad + left) / float(W_new)
+                projf[:, :, 1] = (projf[:, :, 1] * H_unpad + top) / float(H_new)
+                labels["faces_3d"][:, :, 3:5] = projf
+        # =================================
         return labels
 
 
@@ -1856,10 +1929,18 @@ class CopyPaste(BaseMixTransform):
         n = len(indexes)
         sorted_idx = np.argsort(ioa.max(1)[indexes])
         indexes = indexes[sorted_idx]
+
+        # === ignore字段初始准备 ===
+        ignore1 = labels1.get("ignore", np.zeros((len(cls), 1), dtype=np.float32))
+        ignore2 = labels2.get("ignore", np.zeros((len(instances2), 1), dtype=np.float32))
+        ignore_new = [ignore1]
+
         for j in indexes[: round(self.p * n)]:
             cls = np.concatenate((cls, labels2.get("cls", cls)[[j]]), axis=0)
             instances = Instances.concatenate((instances, instances2[[j]]), axis=0)
             cv2.drawContours(im_new, instances2.segments[[j]].astype(np.int32), -1, (1, 1, 1), cv2.FILLED)
+            # 拼接对应ignore
+            ignore_new.append(ignore2[[j]])
 
         result = labels2.get("img", cv2.flip(im, 1))  # augment segments
         if result.ndim == 2:  # cv2.flip would eliminate the last dimension for grayscale images
@@ -1870,6 +1951,8 @@ class CopyPaste(BaseMixTransform):
         labels1["img"] = im
         labels1["cls"] = cls
         labels1["instances"] = instances
+        # === ignore字段合并 ===
+        labels1["ignore"] = np.concatenate(ignore_new, axis=0)
         return labels1
 
 
@@ -2204,6 +2287,12 @@ class Format:
         labels["img"] = self._format_img(img)
         labels["cls"] = torch.from_numpy(cls) if nl else torch.zeros(nl, 1)
         labels["bboxes"] = torch.from_numpy(instances.bboxes) if nl else torch.zeros((nl, 4))
+
+        # === ignore字段tensor化输出 ===
+        if "ignore" in labels:
+            ignore = labels.pop("ignore")
+            labels["ignore"] = torch.as_tensor(ignore, dtype=torch.float32) if len(ignore) else torch.zeros(nl, 1)
+
         if self.return_keypoint:
             labels["keypoints"] = (
                 torch.empty(0, 3) if instances.keypoints is None else torch.from_numpy(instances.keypoints)

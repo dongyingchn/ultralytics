@@ -202,6 +202,21 @@ class BaseDataset(Dataset):
                 j = (cls == include_class_array).any(1)
                 self.labels[i]["cls"] = cls[j]
                 self.labels[i]["bboxes"] = bboxes[j]
+
+                labels_3d = self.labels[i].get("labels_3d", None)
+                faces_3d = self.labels[i].get("faces_3d", None)
+                has_3d_mask = self.labels[i].get("has_3d_mask", None)
+                vehicle_mask = self.labels[i].get("vehicle_mask", None)
+                face_vis_mask = self.labels[i].get("face_vis_mask", None)
+                face_weight = self.labels[i].get("face_weight", None)
+
+                self.labels[i]["labels_3d"] = labels_3d[j] if labels_3d is not None else None
+                self.labels[i]["faces_3d"] = faces_3d[j] if faces_3d is not None else None
+                self.labels[i]["has_3d_mask"] = has_3d_mask[j] if has_3d_mask is not None else None
+                self.labels[i]["vehicle_mask"] = vehicle_mask[j] if vehicle_mask is not None else None
+                self.labels[i]["face_vis_mask"] = face_vis_mask[j] if face_vis_mask is not None else None
+                self.labels[i]["face_weight"] = face_weight[j] if face_weight is not None else None
+
                 if segments:
                     self.labels[i]["segments"] = [segments[si] for si, idx in enumerate(j) if idx]
                 if keypoints is not None:

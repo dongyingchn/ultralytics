@@ -40,6 +40,8 @@ from .utils import (
     save_dataset_cache_file,
     verify_image,
     verify_image_label,
+    verify_image_label_with_ignore,
+    verify_image_label_with_3D,
 )
 
 # Ultralytics dataset *.cache version, >= 1.0.0 for Ultralytics YOLO models
@@ -157,6 +159,177 @@ class YOLODataset(BaseDataset):
         save_dataset_cache_file(self.prefix, path, x, DATASET_CACHE_VERSION)
         return x
 
+    def cache_labels_with_ignore(self, path: Path = Path("./labels.cache")) -> dict:
+        """
+        Cache dataset labels, check images and read shapes.
+
+        Args:
+            path (Path): Path where to save the cache file.
+
+        Returns:
+            (dict): Dictionary containing cached labels and related information.
+        """
+        x = {"labels": []}
+        nm, nf, ne, nc, msgs = 0, 0, 0, 0, []  # number missing, found, empty, corrupt, messages
+        desc = f"{self.prefix}Scanning {path.parent / path.stem}..."
+        total = len(self.im_files)
+        nkpt, ndim = self.data.get("kpt_shape", (0, 0))
+        if self.use_keypoints and (nkpt <= 0 or ndim not in {2, 3}):
+            raise ValueError(
+                "'kpt_shape' in data.yaml missing or incorrect. Should be a list with [number of "
+                "keypoints, number of dims (2 for x,y or 3 for x,y,visible)], i.e. 'kpt_shape: [17, 3]'"
+            )
+        with ThreadPool(NUM_THREADS) as pool:
+            results = pool.imap(
+                func=verify_image_label_with_ignore,
+                iterable=zip(
+                    self.im_files,
+                    self.label_files,
+                    repeat(self.prefix),
+                    repeat(self.use_keypoints),
+                    repeat(len(self.data["names"])),
+                    repeat(nkpt),
+                    repeat(ndim),
+                    repeat(self.single_cls),
+                ),
+            )
+            pbar = TQDM(results, desc=desc, total=total)
+            for im_file, lb, shape, segments, keypoint, ignore, nm_f, nf_f, ne_f, nc_f, msg in pbar:
+                nm += nm_f
+                nf += nf_f
+                ne += ne_f
+                nc += nc_f
+                if im_file:
+                    x["labels"].append(
+                        {
+                            "im_file": im_file,
+                            "shape": shape,
+                            "cls": lb[:, 0:1],  # n, 1
+                            "bboxes": lb[:, 1:],  # n, 4
+                            "ignore": ignore,  # n, 1
+                            "segments": segments,
+                            "keypoints": keypoint,
+                            "normalized": True,
+                            "bbox_format": "xywh",
+                        }
+                    )
+                if msg:
+                    msgs.append(msg)
+                pbar.desc = f"{desc} {nf} images, {nm + ne} backgrounds, {nc} corrupt"
+            pbar.close()
+
+        if msgs:
+            LOGGER.info("\n".join(msgs))
+        if nf == 0:
+            LOGGER.warning(f"{self.prefix}No labels found in {path}. {HELP_URL}")
+        x["hash"] = get_hash(self.label_files + self.im_files)
+        x["results"] = nf, nm, ne, nc, len(self.im_files)
+        x["msgs"] = msgs  # warnings
+        save_dataset_cache_file(self.prefix, path, x, DATASET_CACHE_VERSION)
+        return x
+
+    def cache_labels_with_3D(self, path: Path = Path("./labels.cache")) -> dict:
+        """Cache dataset labels, check images and read shapes.
+
+        Args:
+            path (Path): Path where to save the cache file.
+
+        Returns:
+            (dict): Dictionary containing cached labels and related information.
+        """
+        x = {"labels": []}
+        nm, nf, ne, nc, msgs = 0, 0, 0, 0, []  # number missing, found, empty, corrupt, messages
+        desc = f"{self.prefix}Scanning {path.parent / path.stem}..."
+        total = len(self.im_files)
+        nkpt, ndim = self.data.get("kpt_shape", (0, 0))
+        if self.use_keypoints and (nkpt <= 0 or ndim not in {2, 3}):
+            raise ValueError(
+                "'kpt_shape' in data.yaml missing or incorrect. Should be a list with [number of "
+                "keypoints, number of dims (2 for x,y or 3 for x,y,visible)], i.e. 'kpt_shape: [17, 3]'"
+            )
+
+        # 新增：从 data.yaml 读取 3D 开关（默认 False）
+        parse_3d = bool(self.data.get("enable_3d", False))
+
+        with ThreadPool(NUM_THREADS) as pool:
+            results = pool.imap(
+                func=verify_image_label_with_3D,
+                iterable=zip(
+                    self.im_files,
+                    self.label_files,
+                    repeat(self.prefix),
+                    repeat(self.use_keypoints),
+                    repeat(len(self.data["names"])),
+                    repeat(nkpt),
+                    repeat(ndim),
+                    repeat(self.single_cls),
+                    repeat(parse_3d),  # 新增参数：是否解析 3D
+                ),
+            )
+            pbar = TQDM(results, desc=desc, total=total)
+            for r in pbar:
+                # 兼容旧返回（10 元素）与新返回（11 元素，含 extra3d）
+                if isinstance(r, (list, tuple)) and len(r) == 11:
+                    im_file, lb, shape, segments, keypoint, nm_f, nf_f, ne_f, nc_f, msg, extra3d = r
+                else:
+                    im_file, lb, shape, segments, keypoint, nm_f, nf_f, ne_f, nc_f, msg = r
+                    extra3d = None
+
+
+                # assert len(lb) == extra3d["labels_3d"].shape[0]
+                nm += nm_f
+                nf += nf_f
+                ne += ne_f
+                nc += nc_f
+                if im_file:
+                    label_dict = {
+                        "im_file": im_file,
+                        "shape": shape,
+                        "cls": lb[:, 0:1],  # n, 1
+                        "bboxes": lb[:, 1:],  # n, 4
+                        "segments": segments,
+                        "keypoints": keypoint,
+                        "normalized": True,
+                        "bbox_format": "xywh",
+                    }
+                    # 新增：如果启用 3D，附加 3D 结构（若该图像无目标或无 3D 则为空形状）
+                    if parse_3d:
+                        if extra3d is None:
+                            # 空占位，保持键存在与形状合法
+                            n = label_dict["cls"].shape[0]
+                            label_dict["labels_3d"] = np.full((n, 9), -1.0, dtype=np.float32)
+                            label_dict["faces_3d"] = np.full((n, 4, 7), -1.0, dtype=np.float32)
+                            label_dict["has_3d_mask"] = np.zeros((n,), dtype=bool)
+                            label_dict["vehicle_mask"] = np.zeros((n,), dtype=bool)
+                            label_dict["face_vis_mask"] = np.zeros((n, 4), dtype=bool)
+                            label_dict["face_weight"] = np.zeros((n, 4), dtype=np.float32)
+                        else:
+                            label_dict.update(
+                                {
+                                    "labels_3d": extra3d["labels_3d"],
+                                    "faces_3d": extra3d["faces_3d"],
+                                    "has_3d_mask": extra3d["has_3d_mask"],
+                                    "vehicle_mask": extra3d["vehicle_mask"],
+                                    "face_vis_mask": extra3d["face_vis_mask"],
+                                    "face_weight": extra3d["face_weight"],
+                                }
+                            )
+                    x["labels"].append(label_dict)
+                if msg:
+                    msgs.append(msg)
+                pbar.desc = f"{desc} {nf} images, {nm + ne} backgrounds, {nc} corrupt"
+            pbar.close()
+
+        if msgs:
+            LOGGER.info("\n".join(msgs))
+        if nf == 0:
+            LOGGER.warning(f"{self.prefix}No labels found in {path}. {HELP_URL}")
+        x["hash"] = get_hash(self.label_files + self.im_files)
+        x["results"] = nf, nm, ne, nc, len(self.im_files)
+        x["msgs"] = msgs  # warnings
+        save_dataset_cache_file(self.prefix, path, x, DATASET_CACHE_VERSION)
+        return x
+
     def get_labels(self) -> list[dict]:
         """
         Return dictionary of labels for YOLO training.
@@ -173,7 +346,8 @@ class YOLODataset(BaseDataset):
             assert cache["version"] == DATASET_CACHE_VERSION  # matches current version
             assert cache["hash"] == get_hash(self.label_files + self.im_files)  # identical hash
         except (FileNotFoundError, AssertionError, AttributeError, ModuleNotFoundError):
-            cache, exists = self.cache_labels(cache_path), False  # run cache ops
+            # cache, exists = self.cache_labels_with_ignore(cache_path), False  # run cache ops
+            cache, exists = self.cache_labels_with_3D(cache_path), False  # run cache ops
 
         # Display cache
         nf, nm, ne, nc, n = cache.pop("results")  # found, missing, empty, corrupt, total
@@ -306,8 +480,12 @@ class YOLODataset(BaseDataset):
                 value = torch.stack(value, 0)
             elif k == "visuals":
                 value = torch.nn.utils.rnn.pad_sequence(value, batch_first=True)
-            if k in {"masks", "keypoints", "bboxes", "cls", "segments", "obb"}:
+            if k in {"masks", "keypoints", "bboxes", "cls", "segments", "obb", "ignore"}:
+                value = [torch.as_tensor(v) if not isinstance(v, torch.Tensor) else v for v in value]
                 value = torch.cat(value, 0)
+            # 新增：3D 相关键，自动从 numpy 转为 torch 再拼接
+            if k in {"labels_3d", "faces_3d", "has_3d_mask", "vehicle_mask", "face_vis_mask", "face_weight"}:
+                value = torch.cat([torch.as_tensor(v) for v in value], 0)
             new_batch[k] = value
         new_batch["batch_idx"] = list(new_batch["batch_idx"])
         for i in range(len(new_batch["batch_idx"])):

@@ -168,7 +168,8 @@ class DetectionTrainer(BaseTrainer):
 
     def get_validator(self):
         """Return a DetectionValidator for YOLO model validation."""
-        self.loss_names = "box_loss", "cls_loss", "dfl_loss"
+        # self.loss_names = "box_loss", "cls_loss", "dfl_loss"
+        self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
         return yolo.detect.DetectionValidator(
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
@@ -184,6 +185,9 @@ class DetectionTrainer(BaseTrainer):
         Returns:
             (dict | list): Dictionary of labeled loss items if loss_items is provided, otherwise list of keys.
         """
+
+        self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
+
         keys = [f"{prefix}/{x}" for x in self.loss_names]
         if loss_items is not None:
             loss_items = [round(float(x), 5) for x in loss_items]  # convert tensors to 5 decimal place floats

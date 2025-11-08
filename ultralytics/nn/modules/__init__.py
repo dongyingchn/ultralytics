@@ -80,6 +80,7 @@ from .head import (
     OBB,
     Classify,
     Detect,
+    Detect3D,
     LRPCHead,
     Pose,
     RTDETRDecoder,
@@ -89,6 +90,7 @@ from .head import (
     YOLOESegment,
     v10Detect,
 )
+from .head_with_3d import Detect_with_3D
 from .transformer import (
     AIFI,
     MLP,
@@ -142,6 +144,8 @@ __all__ = (
     "BottleneckCSP",
     "Proto",
     "Detect",
+    "Detect3D",
+    "Detect_with_3D",
     "Segment",
     "Pose",
     "Classify",
