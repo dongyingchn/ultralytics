@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 from ultralytics import YOLO
+from ultralytics import SETTINGS
+
+SETTINGS["tensorboard"] = True  # 关闭 TensorBoard 集成以避免潜在冲突
 
 # model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11n.pt")  # load a pretrained model
 model = YOLO("yolo11-minieye-2d.yaml")  # build a new model from scratch
+# model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect/train12/weights/best.pt")  # build a new model from scratch
 
 # results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=96, device=[0,1,2,3,4,5])  # train the model
 # results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=32, device=[6,7])  # train the model
@@ -104,10 +108,10 @@ def load_partial_weights(model, ckpt_path=None, migrate_head_conv=False):
 
     return model
 
-model.model = load_partial_weights(
-    model.model,
-    ckpt_path="/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11n.pt",
-    migrate_head_conv=False,
-)
+# model.model = load_partial_weights(
+#     model.model,
+#     ckpt_path="/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11n.pt",
+#     migrate_head_conv=False,
+# )
 
-results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=32, device=[0])  # train the model
+results = model.train(data="minieye-driving-2d.yaml", epochs=300, imgsz=960, batch=128, device=[0,1,2,3])  # train the model

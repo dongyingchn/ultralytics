@@ -169,7 +169,8 @@ class DetectionTrainer(BaseTrainer):
     def get_validator(self):
         """Return a DetectionValidator for YOLO model validation."""
         # self.loss_names = "box_loss", "cls_loss", "dfl_loss"
-        self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
+        # self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
+        self.loss_names = ["box", "cls", "dfl", "xyz", "proj", "size", "angle_cls", "angle_reg", "xyz_face", "proj_face", "size_face", "vis_face", "cutcls"]
         return yolo.detect.DetectionValidator(
             self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
@@ -186,7 +187,8 @@ class DetectionTrainer(BaseTrainer):
             (dict | list): Dictionary of labeled loss items if loss_items is provided, otherwise list of keys.
         """
 
-        self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
+        # self.loss_names = ["box", "cls", "dfl", "base3d", "faces3d", "cutcls"]
+        self.loss_names = ["box", "cls", "dfl", "xyz", "proj", "size", "angle_cls", "angle_reg", "xyz_face", "proj_face", "size_face", "vis_face", "cutcls"]
 
         keys = [f"{prefix}/{x}" for x in self.loss_names]
         if loss_items is not None:
