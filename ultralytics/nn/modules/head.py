@@ -469,6 +469,235 @@ class Detect3D(Detect):
             extra3d_cat = self._extra3d_cat(extra3d_levels)  # (bs, n3d, N)
             return ((y_cat, extra3d_cat), (raw_levels, extra3d_levels))
 
+    # Insert into your Detect3D / Detect head class
+    def decode_extra3d(self, extra3d_cat, anchor_points=None, stride_tensor=None, as_numpy=False):
+        """
+        Decode Detect3D extra3d outputs into interpretable physical quantities.
+
+        Accepts either:
+        - extra3d_cat: Tensor shaped (B, n3d, N)
+        - extra3d_cat: list/tuple of level tensors [(B, n3d, H, W), ...] -> will be flattened concat to (B, n3d, N)
+
+        Returns dict with keys (torch tensors by default):
+        - "raw": (B, N, n3d) raw vectors (per-anchor)
+        - "base_raw": (B, N, base_dims)
+        - "faces_raw": (B, N, num_faces, face_dims_out)
+        - "base_decoded": dict of decoded base fields (x absent, we decode z, xc/yc as proj offsets to pixels if anchors provided,
+                            sizes, rotation (heuristic), cutcls probs)
+        - "faces_decoded": dict of decoded face fields (z, proj offsets or proj px, size, score prob)
+
+        Assumptions (match loss and your provided layout):
+        base_dims = 17 with layout:
+            [ z3d, xc, yc, l3d, h3d, w3d, cls_logits(4), residuals(4), cutcls_logits(3) ]
+        face_dims_out = 6 with layout per face:
+            [ z3d_face, proj_x_off, proj_y_off, size_0, size_1, score_logit ]
+        num_faces = 4
+
+        Default inverse-normalization constants (tweak if your training hyperparams differ):
+        z_scale = 40.0, z_offset = 40.0          (reverse (z-40)/40)
+        size_scale = 18.0                        (reverse size/18)
+        proj_scale = 6.0                         (network used tanh*6 in loss-level comparisons)
+        face_size_scale = 18.0
+
+        NOTE: rotation decoding from (cls_logits, residuals) is heuristic here: we compute class-center angles
+        and add residuals (tanh-scaled). If your training used a precise angle-as-class encoding you should
+        replace the heuristic with the exact inverse used during training.
+        """
+        import math
+        import torch
+        import numpy as np
+
+        # Configurable attributes on head (fall back to defaults if not present)
+        num_faces = getattr(self, "num_faces", 4)
+        face_dims_out = getattr(self, "face_dims_out", 6)
+        base_dims = getattr(self, "base_dims", 17)
+
+        # decoding scales (defaults mirror loss.py usage; adapt if different)
+        z_scale = getattr(self, "decode_z_scale", 40.0)
+        z_offset = getattr(self, "decode_z_offset", 40.0)
+        size_scale = getattr(self, "decode_size_scale", 18.0)
+        proj_scale = getattr(self, "decode_proj_scale", 6.0)
+        face_size_scale = getattr(self, "decode_face_size_scale", 18.0)
+
+        # 1. Ensure tensor in (B, n3d, N) then (B, N, n3d)
+        if isinstance(extra3d_cat, (list, tuple)):
+            # flatten per-level (B, n3d, H, W) -> (B, n3d, -1) then concat
+            try:
+                bs = extra3d_cat[0].shape[0]
+                n3d = extra3d_cat[0].shape[1]
+                parts = [e.reshape(bs, n3d, -1) for e in extra3d_cat]
+                extra3d = torch.cat(parts, dim=2)  # (B, n3d, N)
+            except Exception:
+                # fallback: try safe reshape
+                tensors = []
+                for e in extra3d_cat:
+                    if e.ndim == 4:
+                        tensors.append(e.reshape(e.shape[0], e.shape[1], -1))
+                    elif e.ndim == 3:
+                        tensors.append(e)
+                    else:
+                        raise RuntimeError("Unsupported extra3d level shape for decode_extra3d")
+                extra3d = torch.cat(tensors, dim=2)
+        else:
+            extra3d = extra3d_cat  # assume (B, n3d, N)
+
+        if not torch.is_tensor(extra3d):
+            raise TypeError("extra3d_cat must be tensor or list/tuple of tensors")
+
+        B, n3d, N = extra3d.shape
+        raw_bn3d = extra3d.permute(0, 2, 1).contiguous()  # (B, N, n3d)
+
+        # 2. Split into faces_raw and base_raw (if layout matches)
+        expected_n3d = num_faces * face_dims_out + base_dims
+        if n3d != expected_n3d:
+            # shape mismatch: treat all remaining as base
+            faces_raw = None
+            base_raw = raw_bn3d  # (B,N,n3d)
+        else:
+            faces_raw = raw_bn3d[..., : num_faces * face_dims_out].reshape(B, N, num_faces, face_dims_out)
+            base_raw = raw_bn3d[..., num_faces * face_dims_out :]  # (B, N, base_dims)
+
+        # 3. Decode base_raw into interpretable fields
+        base_decoded = {}
+        if base_raw is not None:
+            b = base_raw  # (B,N,base_dims)
+
+            # z
+            base_decoded["z3d"] = b[..., 0] * z_scale + z_offset
+
+            # projection center offsets (xc, yc): network likely outputs offsets which were compared via tanh*proj_scale.
+            # We'll apply tanh then scale. If during training you used another activation, change here.
+            xc_off = torch.tanh(b[..., 1]) * proj_scale
+            yc_off = torch.tanh(b[..., 2]) * proj_scale
+            base_decoded["proj_offset_cell"] = torch.stack([xc_off, yc_off], dim=-1)  # (B,N,2)
+
+            # sizes l,w,h (indices 3,4,5) -> decode
+            base_decoded["l3d"] = b[..., 3] * size_scale
+            base_decoded["h3d"] = b[..., 4] * size_scale
+            base_decoded["w3d"] = b[..., 5] * size_scale
+
+            # angle/class+residual: indices 6:10 (4 cls logits), 10:14 residuals
+            ang_logits = b[..., 6:10]  # (B,N,4)
+            ang_res = b[..., 10:14]    # (B,N,4)
+
+            # convert logits -> probs
+            try:
+                ang_prob = torch.softmax(ang_logits, dim=-1)
+            except Exception:
+                ang_prob = ang_logits  # fallback
+
+            # class-center angles used in training encoding (heuristic / mirror of loss.py):
+            # we use class-centers [0, pi/2, -pi/2, pi] as a reasonable inverse mapping;
+            # if your training used different centers replace accordingly.
+            centers = torch.tensor([0.0, math.pi / 2.0, -math.pi / 2.0, math.pi], device=b.device, dtype=b.dtype)
+            # residuals are tanh-scaled roughly in (-1,1). Choose residual scale (rad) as pi/4 (tunable)
+            res_scale = getattr(self, "decode_angle_residual_scale", (math.pi / 2.0))
+            # expected angle = sum_k prob_k * (center_k + tanh(res_k)*res_scale)
+            res_tanh = torch.tanh(ang_res) * res_scale  # (B,N,4)
+            centers = centers.view(1, 1, 4)
+            angle_components = centers + res_tanh  # (B,N,4)
+            # weighted sum across classes
+            # decoded_angle = (ang_prob * angle_components).sum(dim=-1)  # (B,N)
+            index = torch.argmax(ang_prob, dim=-1)  # (B,N)
+            decoded_angle = angle_components.gather(-1, index.unsqueeze(-1)).squeeze(-1)  # (B,N)
+            base_decoded["rot_y"] = decoded_angle  # radians
+
+            # cutcls logits (3 classes) indices 14:17 -> probabilities
+            cutcls_logits = b[..., 14:17] if base_dims >= 17 else None
+            if cutcls_logits is not None:
+                try:
+                    base_decoded["cutcls_prob"] = torch.sigmoid(cutcls_logits)
+                except Exception:
+                    base_decoded["cutcls_prob"] = cutcls_logits
+
+            # Optionally convert proj offsets to pixel coordinates if anchor_points and stride_tensor available
+            # anchor_points expected shape: (N,2) and stride_tensor shape (N,) or (N,1)
+            
+            # anchor_points shape is actually (2, N) and stride_tensor (N,).
+            if anchor_points is None or stride_tensor is None:
+                # try to fallback to attributes on head (some implementations store anchors/strides)
+                
+                anchor_points = (
+                    anchors if (anchors := getattr(self, "anchors", None)) is not None
+                    else anchor_points
+                )
+                stride_tensor = (
+                    strides if (strides := getattr(self, "strides", None)) is not None
+                    else strides
+                )
+                
+                # reshape if needed
+                if anchor_points is not None and isinstance(anchor_points, torch.Tensor):
+                    if anchor_points.ndim == 2 and anchor_points.shape[0] == 2:
+                        anchor_points = anchor_points.transpose(0, 1)
+                if stride_tensor is not None and isinstance(stride_tensor, torch.Tensor):
+                    if stride_tensor.ndim == 1:
+                        pass
+                    elif stride_tensor.ndim == 2 and stride_tensor.shape[0] == 1:
+                        stride_tensor = stride_tensor.view(-1)
+
+            if anchor_points is not None and stride_tensor is not None:
+                ap = anchor_points.to(device=b.device, dtype=b.dtype)
+                st = stride_tensor.to(device=b.device, dtype=b.dtype)
+                # reshape ap to (1,N,2), st to (1,N,1)
+                if ap.ndim == 3:
+                    ap = ap.reshape(-1, 2)
+                ap_t = ap.view(1, -1, 2)
+                st_t = st.view(1, -1, 1)
+                proj_px = ap_t + base_decoded["proj_offset_cell"] * st_t  # (B,N,2)
+                base_decoded["proj_px"] = proj_px
+            else:
+                # leave offsets in cell units
+                base_decoded["proj_px"] = None
+
+        # 4. Decode faces
+        faces_decoded = None
+        if faces_raw is not None:
+            fr = faces_raw  # (B,N,num_faces,face_dims_out)
+            # z face
+            fz = fr[..., 0] * z_scale + z_offset
+            # proj offsets per-face, apply tanh*proj_scale as in loss usage
+            fproj_off_x = torch.tanh(fr[..., 1]) * proj_scale
+            fproj_off_y = torch.tanh(fr[..., 2]) * proj_scale
+            fproj_off = torch.stack([fproj_off_x, fproj_off_y], dim=-1)  # (B,N,num_faces,2)
+            # sizes (2 dims)
+            fsize = fr[..., 3:5] * face_size_scale
+            # score probability
+            fscore = fr[..., 5] if fr.shape[-1] >= 6 else None
+
+            faces_decoded = {
+                "z3d": fz,
+                "proj_offset_cell": fproj_off,
+                "size": fsize,
+                "score_prob": fscore,
+            }
+
+            # convert to pixel coords if anchors/strides provided
+            if anchor_points is not None and stride_tensor is not None:
+                ap = anchor_points.to(device=fr.device, dtype=fr.dtype)
+                st = stride_tensor.to(device=fr.device, dtype=fr.dtype)
+                if ap.ndim == 3:
+                    ap = ap.reshape(-1, 2)
+                ap_t = ap.view(1, -1, 2).unsqueeze(2)  # (1, N, 1, 2)
+                st_t = st.view(1, -1, 1).unsqueeze(2)  # (1, N, 1, 1)
+                proj_px_face = ap_t + fproj_off * st_t  # (B, N, num_faces, 2)
+                faces_decoded["proj_px"] = proj_px_face
+
+        # 5. Prepare outputs, optionally convert to numpy
+        def maybe_numpy(x):
+            if x is None:
+                return None
+            return x.detach().cpu().numpy() if as_numpy and isinstance(x, torch.Tensor) else x
+
+        out = {
+            "raw": raw_bn3d,  # torch tensor (B, N, n3d)
+            "faces_raw": faces_raw,  # torch tensor or None
+            "base_raw": base_raw,  # torch tensor or None
+            "base_decoded": {k: maybe_numpy(v) for k, v in base_decoded.items()} if base_decoded else {},
+            "faces_decoded": {k: maybe_numpy(v) for k, v in faces_decoded.items()} if faces_decoded else {},
+        }
+        return out
+
     @staticmethod
     def split_extra(extra3d: torch.Tensor, base_dims: int = 9, face_dims: int = 7, num_faces: int = 4) -> tuple[torch.Tensor, torch.Tensor]:
         """

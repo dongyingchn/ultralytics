@@ -98,7 +98,7 @@ class DetectionTrainer(BaseTrainer):
         shuffle = mode == "train"
         if getattr(dataset, "rect", False) and shuffle:
             LOGGER.warning("'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
-            shuffle = False
+            shuffle = True # False
         return build_dataloader(
             dataset,
             batch=batch_size,

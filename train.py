@@ -114,4 +114,4 @@ def load_partial_weights(model, ckpt_path=None, migrate_head_conv=False):
 #     migrate_head_conv=False,
 # )
 
-results = model.train(data="minieye-driving-2d.yaml", epochs=300, imgsz=960, batch=128, device=[0,1,2,3])  # train the model
+results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=128, device=[0,1,2,3], optimizer='AdamW', lr0=0.001, rect=True)  # train the model

@@ -900,6 +900,9 @@ class TVPSegmentLoss(TVPDetectLoss):
         return cls_loss, vp_loss[1]
 
 # ======== 3D Detection Loss (完全向量化版本，新增) ========
+    
+def stats(x): return (x.mean().item(), x.std().item(), x.min().item(), x.max().item())
+
 class v8Detection3DLoss:
     """
     Criterion for YOLOv8 detection + 3D regression head (Detect3D), fully vectorized (no per-image Python loop).
@@ -1237,9 +1240,14 @@ class v8Detection3DLoss:
 
                 l_xyz = self.L1loss(pred_base[m, 0], gt_base_pos_norm[m, 2]) / m_sum
                 
-                gt_proj_off   = gt_base_pos[:, 7:9]                  # (P,2) 像素GT
-                # gt_proj_off  = (gt_proj_px - ap_px) / st_pos        # (P,2) 归一到 cell
+                # gt_proj = gt_base_pos[:, 7:9]                  # (P,2) 归一化GT
+                # gt_proj_px = gt_proj * imgsz[[1, 0]]           # (P,2) 像素GT
+                # gt_proj_off  = (gt_proj_px - ap_px) / st_pos   # (P,2) 偏移归一到 cell
+                gt_proj_off = gt_base_pos[:, 7:9]
                 l_proj = self.L1loss(pred_base[m, 1:2].tanh()*6, gt_proj_off[m, :1]) / m_sum
+
+                # def stats(x): return (x.mean().item(), x.std().item(), x.min().item(), x.max().item())
+                # print("gt_proj_off stats:", stats(gt_proj_off[m, :1]), " pred_base proj stats:", stats(pred_base[m, 1:2].tanh()*6))
 
                 l_lwh = self.L1loss(pred_base[m, 3:6], gt_base_pos_norm[m, 3:6]) / (m_sum * 3)
 
@@ -1267,6 +1275,10 @@ class v8Detection3DLoss:
 
                 valid_face = vis * w
 
+                g_faces[:, :, 0] = g_faces[:, :, 1] / 35.0
+                g_faces[:, :, 1] = g_faces[:, :, 0] / 5.0
+                g_faces[:, :, 2] = (g_faces[:, :, 2] - 40) / 40
+
                 gt_base = gt_base_pos[vm]  # (Pv, 9)
                 gt_faces_with_size = torch.zeros((g_faces.shape[0], g_faces.shape[1], 9), device=g_faces.device, dtype=g_faces.dtype)
                 gt_faces_with_size[:, :, :7] = g_faces
@@ -1274,18 +1286,25 @@ class v8Detection3DLoss:
                 gt_faces_with_size[:, 2:, 7:9] = gt_base[:, 3:5].unsqueeze(1).repeat(1, 2, 1)
 
                 # xyz (Pv,4,3) -> mean over last -> (Pv,4)
-                l_xyz_face = self.L1loss_noredu(p_faces[:, :, 0], g_faces[:, :, 2]/18.0)
+                l_xyz_face = self.L1loss_noredu(p_faces[:, :, 0], g_faces[:, :, 2])
                 
                 # proj (Pv,4,2) -> (Pv,4)
-                gt_proj_face_off = gt_faces_pos[:, :, 3:5]                                              # (P,4,2) 像素GT
-                # gt_proj_face_off = (gt_proj_face_px - ap_px[:, None, :]) / st_pos[:, None, :]          # (P,4,2)
+                gt_proj_face_off = gt_faces_pos[:, :, 3:5]                                        # (P,4,2) 像素GT
+                # gt_proj_face = gt_faces_pos[:, :, 3:5]                                              # (P,4,2) 归一化GT
+                # gt_proj_face_px = gt_proj_face * imgsz[[1, 0]]                                      # (P,4,2) 像素GT
+                # gt_proj_face_off = (gt_proj_face_px - ap_px[:, None, :]) / st_pos[:, None, :]       # (P,4,2)
                 l_proj_face = self.L1loss_noredu(p_faces[:, :, 1:2].tanh()*6, gt_proj_face_off[vm,:, :1]).mean(-1)
+
+                # def stats(x): return (x.mean().item(), x.std().item(), x.min().item(), x.max().item())
+                # print("gt_proj_face stats:", stats(gt_proj_face_off[vm,:, :1]), " pred_proj_face stats:", stats(p_faces[:, :, 1:2].tanh()*6))
                 
                 gt_faces_with_size_norm = gt_faces_with_size[:, :, 7:9] / 18.0
                 l_size_face = self.L1loss_noredu(p_faces[:, :, 3:5], gt_faces_with_size_norm).mean(-1)
 
                 # 可见性 BCE（所有面）
-                l_vis_face = F.binary_cross_entropy_with_logits(p_faces[:, :, 5], g_faces[:, :, 6], reduction="none")
+                # l_vis_face = F.binary_cross_entropy_with_logits(p_faces[:, :, 5], g_faces[:, :, 6], reduction="none")
+                l_vis_face = self.L1loss_noredu(p_faces[:, :, 5], g_faces[:, :, 5])
+                # print("g_faces stats:", stats(g_faces[:, :, 5]), " p_faces stats:", stats(p_faces[:, :, 5]))
 
                 # score 回归（仅可见）
                 # l_score_face = F.smooth_l1_loss(torch.sigmoid(p_faces[:, :, 5]), g_faces[:, :, 5], reduction="none")

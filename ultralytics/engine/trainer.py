@@ -214,7 +214,7 @@ class BaseTrainer:
             # Argument checks
             if self.args.rect:
                 LOGGER.warning("'rect=True' is incompatible with Multi-GPU training, setting 'rect=False'")
-                self.args.rect = False
+                self.args.rect = True # default: False
             if self.args.batch < 1.0:
                 LOGGER.warning(
                     "'batch<1' for AutoBatch is incompatible with Multi-GPU training, setting default 'batch=16'"
