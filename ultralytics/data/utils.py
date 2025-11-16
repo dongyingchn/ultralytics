@@ -11,7 +11,7 @@ import zipfile
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from tarfile import is_tarfile
-from typing import Any
+from typing import Any, Iterable
 
 import cv2
 import numpy as np
@@ -340,6 +340,151 @@ def verify_image_label_with_ignore(args: tuple) -> list:
         msg = f"{prefix}{im_file}: ignoring corrupt image/label: {e}"
         return [None, None, None, None, None, None, nm, nf, ne, nc, msg]
 
+def build_name2id(names):
+    """
+    将 data.yaml 中的 names 转为 name->id 映射。
+
+    支持输入形式：
+      - dict like {0: 'car', 1: 'bus'}
+      - list/tuple like ['car', 'bus']
+    value 可以是 'car/bus'（同义词）或 list/tuple of names。
+    输出 keys 已 strip() 和 lower() 以便统一。
+    若存在重复 name，对后来的定义会覆盖前者（并返回 warnings）。
+    """
+    if names is None:
+        return {}
+    name2id = {}
+    warnings = []
+    # 支持 list/tuple
+    if not isinstance(names, dict):
+        try:
+            items = list(enumerate(names))
+        except Exception:
+            raise ValueError("names must be dict or list-like")
+    else:
+        items = names.items()
+
+    for k, v in items:
+        try:
+            idx = int(k)
+        except Exception:
+            # 如果 key 是字符串数字也尝试转换
+            try:
+                idx = int(str(k))
+            except Exception:
+                raise ValueError(f"invalid class id key: {k}")
+
+        # 规范化 value -> list of string names
+        if isinstance(v, str):
+            variants = [vv.strip().lower() for vv in v.split("/") if vv.strip()]
+        elif isinstance(v, (list, tuple)):
+            variants = [str(vv).strip().lower() for vv in v if str(vv).strip()]
+        else:
+            variants = [str(v).strip().lower()]
+
+        for nm in variants:
+            if nm in name2id and name2id[nm] != idx:
+                warnings.append(f"name '{nm}' already mapped to {name2id[nm]}, now mapped to {idx}")
+            name2id[nm] = idx
+
+    if warnings:
+        # 可改为 logging.warning
+        print("build_name2id warnings:", *warnings, sep="\n - ")
+    return name2id
+
+def _map_label_names_to_indices(lb: np.ndarray | list | None, names: dict | Iterable | None) -> np.ndarray:
+    """
+    Map string class tokens in `lb` (YOLO-format label array) to numeric indices using `names`.
+    Behaviors:
+      - If lb is None or empty -> returns empty float32 array with shape (0, ...)
+      - If lb dtype is numeric -> returns lb.astype(np.float32)
+      - If first column contains string tokens, map them to indices via names mapping.
+      - Accepts numeric strings like "0" as indices.
+      - Raises ValueError if a token cannot be mapped.
+    """
+    if lb is None:
+        return np.zeros((0, 5), dtype=np.float32)  # default shape if unknown
+    # Convert lists to numpy for uniform processing
+    if not isinstance(lb, np.ndarray):
+        try:
+            lb = np.asarray(lb)
+        except Exception:
+            # fallback: return empty
+            return np.zeros((0, 5), dtype=np.float32)
+
+    if lb.size == 0:
+        return lb.astype(np.float32)
+
+    # If first column already numeric, return casted array
+    if np.issubdtype(lb.dtype, np.number):
+        return lb.astype(np.float32)
+
+    # Build name->id mapping
+    name2id = _build_name2id(names)
+
+    # Prepare output as float32 with same number of columns as lb
+    cols = lb.shape[1] if lb.ndim == 2 else 1
+    try:
+        lb_str_first_col = lb[:, 0].astype(str)
+    except Exception:
+        # fallback: try flatten or single row
+        lb = lb.reshape(-1, cols)
+        lb_str_first_col = lb[:, 0].astype(str)
+
+    mapped_idxs = []
+    for raw in lb_str_first_col:
+        token = str(raw).strip().lower()
+        if token == "":
+            raise ValueError(f"Empty class token found in label; cannot map to index.")
+        # numeric string handling
+        if token.isdigit():
+            mapped_idxs.append(int(token))
+            continue
+        # direct mapping
+        if token in name2id:
+            mapped_idxs.append(name2id[token])
+            continue
+        # split tokens and try partial matches (underscores -> spaces)
+        parts = [p.strip() for p in token.replace("_", " ").split()]
+        found = False
+        for p in parts:
+            if p in name2id:
+                mapped_idxs.append(name2id[p])
+                found = True
+                break
+        if found:
+            continue
+        # fuzzy normalize (remove non-alphanum) and compare
+        norm_token = re.sub(r"[^a-z0-9]+", "", token)
+        for nm, idx in name2id.items():
+            if re.sub(r"[^a-z0-9]+", "", nm) == norm_token:
+                mapped_idxs.append(idx)
+                found = True
+                break
+        if found:
+            continue
+        # not resolved
+        raise ValueError(
+            f"Unable to map class label '{raw}' to an index. Provide mapping in data.yaml 'names' or use numeric ids."
+        )
+
+    # Build new lb array with mapped first column
+    # If lb had multiple columns, preserve them; else create minimal format (cls + zeros)
+    if lb.ndim == 1:
+        # single-row like ["car", x, y, w, h] may produce 1D array; reshape to (1, N)
+        lb = lb.reshape(1, -1)
+
+    lb_float = np.zeros(lb.shape, dtype=np.float32)
+    lb_float[:, 0] = np.array(mapped_idxs, dtype=np.float32)
+    # Try to copy remaining columns if they look numeric
+    for c in range(1, lb.shape[1]):
+        try:
+            lb_float[:, c] = lb[:, c].astype(np.float32)
+        except Exception:
+            # if cannot cast, set zeros
+            lb_float[:, c] = 0.0
+    return lb_float
+
 def verify_image_label_with_3D(args: tuple) -> list:
     """Verify one image-label pair.
     新增：当 args 最后一个布尔位为 True 时，解析 3D 标签并在返回值中追加 extra3d 字典（第 11 个返回项）。
@@ -349,7 +494,7 @@ def verify_image_label_with_3D(args: tuple) -> list:
         im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls = args
         parse_3d = False
     else:
-        im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls, parse_3d = args
+        im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim, single_cls, parse_3d, names = args
 
     # Number (missing, found, empty, corrupt), message, segments, keypoints
     nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, "", [], None
@@ -380,6 +525,20 @@ def verify_image_label_with_3D(args: tuple) -> list:
                 and parse_3d
                 and all(len(x) in {6, 18, 50} for x in raw)
             )
+
+            # names = {0:'car'} 转为 name2id = {'car':0}
+            name2id = build_name2id(names) if names else {}
+            
+            # 将字符串类别映射为数字索引
+            for i, toks in enumerate(raw):
+                cls_token = toks[0]
+                if not cls_token.isdigit():
+                    if cls_token in name2id:
+                        raw[i][0] = str(name2id[cls_token])
+                    else:
+                        raise ValueError(
+                            f"Unable to map class label '{cls_token}' to an index. Provide mapping in data.yaml 'names' or use numeric ids."
+                        )
 
             if not keypoint and (not is_3d_format) and any(len(x) > 6 for x in raw):  # is segment
                 classes = np.array([x[0] for x in raw], dtype=np.float32)
@@ -493,6 +652,12 @@ def verify_image_label_with_3D(args: tuple) -> list:
                 kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
                 keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
         lb = lb[:, :5]
+
+        # try:
+        #     lb = _map_label_names_to_indices(lb, names)
+        # except ValueError as e:
+        #     # propagate informative message to caller; skip this file
+        #     return "", None, None, [], None, nm, nf, ne, nc, f"{lb_file}: {e}", None
 
         assert len(lb) == (len(extra3d["labels_3d"]) if extra3d is not None else len(lb)), f"2D and 3D label counts do not match in {lb_file}"
 

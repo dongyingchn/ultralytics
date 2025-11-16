@@ -64,7 +64,19 @@ Example:
         masks = r.masks  # Masks object for segment masks outputs
         probs = r.probs  # Class probabilities for classification outputs
 """
-
+def _normalize_and_clip_roi(roi, full_w: int, full_h: int):
+    """Normalize roi-like input to (x1,y1,x2,y2) clipped to image bounds, or return None."""
+    if roi is None:
+        return None
+    try:
+        x1, y1, x2, y2 = (int(round(v)) for v in roi)
+    except Exception:
+        return None
+    # x1 = max(0, min(x1, full_w - 1))
+    # y1 = max(0, min(y1, full_h - 1))
+    # x2 = max(x1 + 1, min(x2, full_w))
+    # y2 = max(y1 + 1, min(y2, full_h))
+    return (x1, y1, x2, y2)
 
 class BasePredictor:
     """
@@ -161,7 +173,56 @@ class BasePredictor:
         """
         not_tensor = not isinstance(im, torch.Tensor)
         if not_tensor:
-            im = np.stack(self.pre_transform(im))
+
+            # Decide ROI source order:
+            # 1) dataset.last_rois_for_batch provided by loader (best for per-image ROI)
+            # 2) CLI/API arg: self.args.roi
+            # 3) data.yaml top-level roi: self.data.get("roi") (if self.data is a dict)
+            batch_rois = None
+            batch_full_shapes = []
+            imgs_to_transform = []
+
+            # prefer loader-provided per-batch rois if available
+            if hasattr(self, "dataset") and getattr(self.dataset, "last_rois_for_batch", None) is not None:
+                candidate_rois = list(getattr(self.dataset, "last_rois_for_batch"))
+            else:
+                candidate_rois = None
+
+            for i, im0 in enumerate(im):
+                full_h, full_w = im0.shape[:2]
+                # determine per-image roi
+                per_roi = None
+                if candidate_rois is not None:
+                    try:
+                        per_roi = candidate_rois[i] if i < len(candidate_rois) else None
+                    except Exception:
+                        per_roi = None
+                if per_roi is None:
+                    per_roi = getattr(self.args, "roi", None)
+                if per_roi is None:
+                    per_roi = (self.data.get("roi") if isinstance(self.data, dict) else None)
+                per_roi = _normalize_and_clip_roi(per_roi, full_w, full_h)
+
+                per_roi = [0, 160, 3840, 1696] if per_roi is None else per_roi
+
+                # crop if ROI exists
+                if per_roi is not None:
+                    x1, y1, x2, y2 = per_roi
+                    im_c = im0[y1:y2, x1:x2]
+                else:
+                    im_c = im0
+
+                imgs_to_transform.append(im_c)
+                batch_full_shapes.append((full_h, full_w))
+                if batch_rois is None:
+                    batch_rois = []
+                batch_rois.append(per_roi)
+
+            # store metadata for postprocess
+            self._batch_rois = batch_rois
+            self._batch_full_shapes = batch_full_shapes
+
+            im = np.stack(self.pre_transform(imgs_to_transform))
             if im.shape[-1] == 3:
                 im = im[..., ::-1]  # BGR to RGB
             im = im.transpose((0, 3, 1, 2))  # BHWC to BCHW, (n, 3, h, w)

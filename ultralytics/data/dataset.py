@@ -89,7 +89,13 @@ class YOLODataset(BaseDataset):
         self.use_obb = task == "obb"
         self.data = data
         assert not (self.use_segments and self.use_keypoints), "Can not use both segments and keypoints."
-        super().__init__(*args, channels=self.data.get("channels", 3), **kwargs)
+
+        # NEW: read roi from data dict (if provided) and forward it to BaseDataset
+        roi = None
+        if isinstance(self.data, dict):
+            roi = self.data.get("roi", None)  # expected form [x1, y1, x2, y2] or None
+
+        super().__init__(*args, channels=self.data.get("channels", 3), roi=roi, **kwargs)
 
     def cache_labels(self, path: Path = Path("./labels.cache")) -> dict:
         """
@@ -264,6 +270,7 @@ class YOLODataset(BaseDataset):
                     repeat(ndim),
                     repeat(self.single_cls),
                     repeat(parse_3d),  # 新增参数：是否解析 3D
+                    repeat(self.data["names"]),
                 ),
             )
             pbar = TQDM(results, desc=desc, total=total)

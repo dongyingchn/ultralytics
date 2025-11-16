@@ -380,12 +380,18 @@ class DetectionPredictor(BasePredictor):
         Returns:
             (list[Results]): List of Results objects containing detection information for each image.
         """
-        return [
-            self.construct_result(pred, img, orig_img, img_path)
-            for pred, orig_img, img_path in zip(preds, orig_imgs, self.batch[0])
-        ]
+        # return [
+        #     self.construct_result(pred, img, orig_img, img_path)
+        #     for pred, orig_img, img_path in zip(preds, orig_imgs, self.batch[0])
+        # ]
+    
+        results = []
+        batch_paths = self.batch[0] if hasattr(self, "batch") and len(self.batch) > 0 else [None] * len(orig_imgs)
+        for idx, (pred, orig_img, img_path) in enumerate(zip(preds, orig_imgs, batch_paths)):
+            results.append(self.construct_result(pred, img, orig_img, img_path, idx))
+        return results
 
-    def construct_result(self, pred, img, orig_img, img_path):
+    def construct_result(self, pred, img, orig_img, img_path, batch_index: int = 0):
         """
         Construct a single Results object from one image prediction.
 
@@ -398,5 +404,51 @@ class DetectionPredictor(BasePredictor):
         Returns:
             (Results): Results object containing the original image, image path, class names, and scaled bounding boxes.
         """
-        pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
-        return Results(orig_img, path=img_path, names=self.model.names, boxes=pred[:, :6])
+        # pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
+        # return Results(orig_img, path=img_path, names=self.model.names, boxes=pred[:, :6])
+    
+        # If there are no detections
+        if pred is None or pred.shape[0] == 0:
+            return Results(orig_img, path=img_path, names=self.model.names, boxes=np.zeros((0, 6)))
+
+        # Determine ROI metadata for this batch index
+        batch_rois = getattr(self, "_batch_rois", None)
+        batch_full_shapes = getattr(self, "_batch_full_shapes", None)
+
+        roi = None
+        full_shape = None
+        if batch_rois is not None and batch_index < len(batch_rois):
+            roi = batch_rois[batch_index]
+        if batch_full_shapes is not None and batch_index < len(batch_full_shapes):
+            full_shape = batch_full_shapes[batch_index]
+
+        # If ROI exists, target for scaling is the crop shape; otherwise target is orig_img.shape
+        if roi is not None:
+            x1, y1, x2, y2 = (int(v) for v in roi)
+            crop_h = y2 - y1
+            crop_w = x2 - x1
+            # scale from model input shape -> cropped image (pixels)
+            pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], (crop_h, crop_w))
+            # shift to full-image coordinates by adding roi offsets
+            pred[:, 0] += x1
+            pred[:, 2] += x1
+            pred[:, 1] += y1
+            pred[:, 3] += y1
+            # orig_for_plot: prefer to use original full image for plotting if available via self.dataset
+            full_img_for_plot = None
+            # If predictor dataset provided full images for this batch (loader can expose them), use them
+            dataset_full_images = getattr(self, "dataset", None)
+            if dataset_full_images is not None and getattr(dataset_full_images, "last_full_images_for_batch", None):
+                try:
+                    full_img_for_plot = dataset_full_images.last_full_images_for_batch[batch_index]
+                except Exception:
+                    full_img_for_plot = None
+            if full_img_for_plot is None:
+                # fallback to provided orig_img (which is the original full image passed into postprocess)
+                full_img_for_plot = orig_img
+            return Results(full_img_for_plot, path=img_path, names=self.model.names, boxes=pred[:, :6])
+
+        else:
+            # No ROI: keep original behavior (scale directly to orig_img.shape)
+            pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
+            return Results(orig_img, path=img_path, names=self.model.names, boxes=pred[:, :6])

@@ -973,6 +973,10 @@ class v8Detection3DLoss:
         self.L1loss = nn.L1Loss(reduction='sum')
         self.smoothL1loss = nn.SmoothL1Loss(reduction='sum')
 
+        # train_3d flag: control whether to compute 3D losses.
+        # Default: False (2D-only training). To enable 3D supervision set model.args.train_3d = True.
+        self.train_3d = bool(getattr(h, "train_3d", False))
+
     # ---------- 与 v8DetectionLoss 一致的工具 ----------
     def preprocess(self, targets: torch.Tensor, batch_size: int, scale_tensor: torch.Tensor) -> torch.Tensor:
         nl, ne = targets.shape
@@ -1172,6 +1176,16 @@ class v8Detection3DLoss:
             )
             loss_vec[0] = l_iou
             loss_vec[2] = l_dfl
+
+        # If 3D training disabled, skip the heavy 3D processing and return only 2D losses.
+        if not self.train_3d:
+            # Apply 2D gains
+            loss_vec[0] *= self.hyp.box
+            loss_vec[1] *= self.hyp.cls
+            loss_vec[2] *= self.hyp.dfl
+
+            total_loss = loss_vec[:3].sum()
+            return total_loss * batch_size, loss_vec.detach()
 
         # ---------------- 3D GT 预处理（按图像分组 + padding） ----------------
         labels_3d_flat = batch.get("labels_3d", torch.zeros(0, self.base_dims, device=self.device)).to(self.device)

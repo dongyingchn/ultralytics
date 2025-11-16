@@ -69,6 +69,14 @@ class BaseDataset(Dataset):
         get_labels: Get labels method to be implemented by subclasses.
     """
 
+    """
+    Base dataset class for loading and processing image data.
+
+    Added ROI support:
+      - global ROI: pass roi=(x1,y1,x2,y2) to __init__
+      - per-image ROI: provide label["roi"] = (x1,y1,x2,y2) in labels loaded by get_labels()
+    """
+
     def __init__(
         self,
         img_path: str | list[str],
@@ -85,6 +93,7 @@ class BaseDataset(Dataset):
         classes: list[int] | None = None,
         fraction: float = 1.0,
         channels: int = 3,
+        roi: tuple[int, int, int, int] | None = None,  # NEW: global roi (x1,y1,x2,y2) or None
     ):
         """
         Initialize BaseDataset with given configuration and options.
@@ -114,6 +123,7 @@ class BaseDataset(Dataset):
         self.fraction = fraction
         self.channels = channels
         self.cv2_flag = cv2.IMREAD_GRAYSCALE if channels == 1 else cv2.IMREAD_COLOR
+        self.roi = roi  # store global ROI
         self.im_files = self.get_img_files(self.img_path)
         self.labels = self.get_labels()
         self.update_labels(include_class=classes)  # single_cls and include_class
@@ -278,10 +288,81 @@ class BaseDataset(Dataset):
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
 
+    def load_image_with_ROI(self, i: int, rect_mode: bool = True, roi: tuple[int, int, int, int] | None = None) -> tuple:
+        """
+        Load an image from dataset index 'i'.
+
+        Now supports ROI cropping. Returns:
+            (im_resized, (h0_full, w0_full), (h0_crop, w0_crop), (h_resized, w_resized))
+
+        Previously it returned (im, (h0, w0), im.shape[:2]).
+        To stay compatible with callers expecting 3-tuple, callers are updated to accept a 4-tuple.
+        """
+        im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i]
+        if im is None:  # not cached in RAM
+            if fn.exists():  # load npy
+                try:
+                    im_full = np.load(fn)
+                except Exception as e:
+                    LOGGER.warning(f"{self.prefix}Removing corrupt *.npy image file {fn} due to: {e}")
+                    Path(fn).unlink(missing_ok=True)
+                    im_full = imread(f, flags=self.cv2_flag)  # BGR
+            else:  # read image
+                im_full = imread(f, flags=self.cv2_flag)  # BGR
+            if im_full is None:
+                raise FileNotFoundError(f"Image Not Found {f}")
+
+            h0_full, w0_full = im_full.shape[:2]  # full original hw
+
+            # Crop ROI if provided (roi in pixel coordinates relative to full image)
+            if roi is None:
+                roi_pixel = None
+                im_crop = im_full
+                h0_crop, w0_crop = h0_full, w0_full
+            else:
+                x1, y1, x2, y2 = (int(round(v)) for v in roi)
+                # x1 = max(0, min(x1, w0_full - 1))
+                # y1 = max(0, min(y1, h0_full - 1))
+                # x2 = max(x1 + 1, min(x2, w0_full))
+                # y2 = max(y1 + 1, min(y2, h0_full))
+                im_crop = im_full[y1:y2, x1:x2]
+                h0_crop, w0_crop = im_crop.shape[:2]
+
+            # Resize / rect logic applied to the cropped image
+            if rect_mode:  # resize long side to imgsz while maintaining aspect ratio
+                r = self.imgsz / max(h0_crop, w0_crop)  # ratio
+                if r != 1:  # if sizes are not equal
+                    w, h = (min(math.ceil(w0_crop * r), self.imgsz), min(math.ceil(h0_crop * r), self.imgsz))
+                    im_resized = cv2.resize(im_crop, (w, h), interpolation=cv2.INTER_LINEAR)
+                else:
+                    im_resized = im_crop
+            elif not (h0_crop == w0_crop == self.imgsz):  # resize by stretching image to square imgsz
+                im_resized = cv2.resize(im_crop, (self.imgsz, self.imgsz), interpolation=cv2.INTER_LINEAR)
+            else:
+                im_resized = im_crop
+
+            if im_resized.ndim == 2:
+                im_resized = im_resized[..., None]
+
+            # Add to buffer if training with augmentations
+            if self.augment:
+                self.ims[i], self.im_hw0[i], self.im_hw[i] = im_resized, (h0_crop, w0_crop), im_resized.shape[:2]
+                self.buffer.append(i)
+                if 1 < len(self.buffer) >= self.max_buffer_length:  # prevent empty buffer
+                    j = self.buffer.pop(0)
+                    if self.cache != "ram":
+                        self.ims[j], self.im_hw0[j], self.im_hw[j] = None, None, None
+
+            # Return resized image and shapes
+            return im_resized, (h0_full, w0_full), (h0_crop, w0_crop), im_resized.shape[:2]
+
+        # if cached in RAM, we previously stored im as the resized image; we don't have crop info stored -> return existing shapes
+        return self.ims[i], self.im_hw0[i], self.im_hw[i], self.im_hw[i]
+
     def cache_images(self) -> None:
         """Cache images to memory or disk for faster training."""
         b, gb = 0, 1 << 30  # bytes of cached images, bytes per gigabytes
-        fcn, storage = (self.cache_images_to_disk, "Disk") if self.cache == "disk" else (self.load_image, "RAM")
+        fcn, storage = (self.cache_images_to_disk, "Disk") if self.cache == "disk" else (self.load_image_with_ROI, "RAM") #(self.load_image, "RAM")
         with ThreadPool(NUM_THREADS) as pool:
             results = pool.imap(fcn, range(self.ni))
             pbar = TQDM(enumerate(results), total=self.ni, disable=LOCAL_RANK > 0)
@@ -366,12 +447,73 @@ class BaseDataset(Dataset):
             return False
         return True
 
+    # def set_rectangle(self) -> None:
+    #     """Set the shape of bounding boxes for YOLO detections as rectangles."""
+    #     bi = np.floor(np.arange(self.ni) / self.batch_size).astype(int)  # batch index
+    #     nb = bi[-1] + 1  # number of batches
+
+    #     s = np.array([x.pop("shape") for x in self.labels])  # hw
+    #     ar = s[:, 0] / s[:, 1]  # aspect ratio
+    #     irect = ar.argsort()
+    #     self.im_files = [self.im_files[i] for i in irect]
+    #     self.labels = [self.labels[i] for i in irect]
+    #     ar = ar[irect]
+
+    #     # Set training image shapes
+    #     shapes = [[1, 1]] * nb
+    #     for i in range(nb):
+    #         ari = ar[bi == i]
+    #         mini, maxi = ari.min(), ari.max()
+    #         if maxi < 1:
+    #             shapes[i] = [maxi, 1]
+    #         elif mini > 1:
+    #             shapes[i] = [1, 1 / mini]
+
+    #     self.batch_shapes = np.ceil(np.array(shapes) * self.imgsz / self.stride + self.pad).astype(int) * self.stride
+    #     self.batch = bi  # batch index of image
+
     def set_rectangle(self) -> None:
         """Set the shape of bounding boxes for YOLO detections as rectangles."""
         bi = np.floor(np.arange(self.ni) / self.batch_size).astype(int)  # batch index
         nb = bi[-1] + 1  # number of batches
 
-        s = np.array([x.pop("shape") for x in self.labels])  # hw
+        # --- ROI-aware shape extraction: for each label compute crop shape if roi present ---
+        s_list = []
+        for i in range(len(self.labels)):
+            label = self.labels[i]
+            # original shape stored in label["shape"] is (h, w) for full image
+            orig_shape = label.get("shape", None)
+            if orig_shape is None:
+                # fallback: if missing, assume (imgsz, imgsz) to avoid zero division
+                full_h, full_w = self.imgsz, self.imgsz
+            else:
+                full_h, full_w = int(orig_shape[0]), int(orig_shape[1])
+
+            # determine roi: per-image overrides global
+            roi = label.get("roi", None) if isinstance(label, dict) else None
+            if roi is None:
+                roi = getattr(self, "roi", None)
+
+            if roi is None:
+                crop_h, crop_w = full_h, full_w
+            else:
+                # roi expected as (x1, y1, x2, y2) in pixel coords relative to full image
+                x1, y1, x2, y2 = (int(round(v)) for v in roi)
+                # clip to image bounds
+                x1 = max(0, min(x1, full_w - 1))
+                y1 = max(0, min(y1, full_h - 1))
+                x2 = max(x1 + 1, min(x2, full_w))
+                y2 = max(y1 + 1, min(y2, full_h))
+                crop_w = max(1, x2 - x1)
+                crop_h = max(1, y2 - y1)
+
+            # update label["shape"] to be the crop shape so later logic sees cropped sizes
+            self.labels[i]["shape"] = (int(crop_h), int(crop_w))
+            s_list.append((int(crop_h), int(crop_w)))
+
+        s = np.array(s_list)  # hw
+
+        # --- rest of original logic unchanged ---
         ar = s[:, 0] / s[:, 1]  # aspect ratio
         irect = ar.argsort()
         self.im_files = [self.im_files[i] for i in irect]
@@ -395,6 +537,251 @@ class BaseDataset(Dataset):
         """Return transformed label information for given index."""
         return self.transforms(self.get_image_and_label(index))
 
+    def _adapt_label_for_roi(
+        self,
+        label: dict[str, Any],
+        roi: tuple[int, int, int, int] | None,
+        full_hw: tuple[int, int],
+        crop_hw: tuple[int, int],
+    ) -> dict[str, Any]:
+        """
+        If roi is not None, adapt label coordinates (which are expected to be normalized relative to full image)
+        to the cropped image coordinate system and re-normalize to the cropped image.
+
+        This function mutates and returns label (deepcopy already done by caller).
+        It handles:
+          - label["bboxes"]: xywh normalized OR absolute (we detect by value ranges)
+          - label["segments"]: list of np.array (N,2) normalized OR absolute
+          - label["keypoints"]: numpy array [..., 2] or normalized
+          - 3D fields: best-effort transform of x,y components (first two dims).
+        Also filters out objects that fall fully outside the crop.
+        """
+        if roi is None:
+            return label
+
+        x1, y1, x2, y2 = roi
+        full_h, full_w = full_hw
+        crop_h, crop_w = crop_hw
+
+        # Helper: convert normalized xywh -> absolute cx,cy,w,h (pixels)
+        bboxes = label.get("bboxes")
+        if bboxes is None or bboxes.size == 0:
+            label["bboxes"] = np.zeros((0, 4), dtype=np.float32)
+            # segments/keypoints/3d keep original shapes or empty
+            return label
+
+        b = np.array(bboxes, dtype=np.float32).copy()  # (n,4)
+        normalized_flag = label.get("normalized", True)
+
+        if normalized_flag:
+            # xywh normalized w.r.t full image
+            cx_abs = b[:, 0] * full_w
+            cy_abs = b[:, 1] * full_h
+            w_abs = b[:, 2] * full_w
+            h_abs = b[:, 3] * full_h
+        else:
+            cx_abs = b[:, 0]
+            cy_abs = b[:, 1]
+            w_abs = b[:, 2]
+            h_abs = b[:, 3]
+
+        # Convert center-based -> xyxy absolute (full image coords)
+        x1_box = cx_abs - w_abs / 2.0
+        y1_box = cy_abs - h_abs / 2.0
+        x2_box = cx_abs + w_abs / 2.0
+        y2_box = cy_abs + h_abs / 2.0
+
+        # Shift into crop coordinates (origin at roi x1,y1)
+        x1_box_crop = x1_box - x1
+        y1_box_crop = y1_box - y1
+        x2_box_crop = x2_box - x1
+        y2_box_crop = y2_box - y1
+
+        # Intersection with crop bounds
+        clip_x1 = np.clip(x1_box_crop, 0, crop_w)
+        clip_y1 = np.clip(y1_box_crop, 0, crop_h)
+        clip_x2 = np.clip(x2_box_crop, 0, crop_w)
+        clip_y2 = np.clip(y2_box_crop, 0, crop_h)
+
+        # Compute areas for filtering
+        orig_area = np.maximum(0.0, (x2_box_crop - x1_box_crop)) * np.maximum(0.0, (y2_box_crop - y1_box_crop))
+        inter_w = np.maximum(0.0, clip_x2 - clip_x1)
+        inter_h = np.maximum(0.0, clip_y2 - clip_y1)
+        inter_area = inter_w * inter_h
+
+        # Decide keep mask:
+        # - keep if intersection area is > 0 and either center is inside crop,
+        #   or intersection area is at least min_area_ratio of original area (to avoid tiny fragments).
+        min_area_ratio = 0.3  # keep if >= 5% of original area (tunable)
+        center_x_crop = (cx_abs - x1)
+        center_y_crop = (cy_abs - y1)
+        center_inside = (center_x_crop > 0) & (center_x_crop < crop_w) & (center_y_crop > 0) & (center_y_crop < crop_h)
+
+        # handle orig_area == 0 (degenerate) by comparing against small absolute threshold
+        orig_area_safe = np.where(orig_area <= 0.0, 1.0, orig_area)
+        keep_by_area = inter_area / orig_area_safe >= min_area_ratio
+        keep_mask = (inter_area > 0) & (center_inside | keep_by_area)
+
+        # # Convert center-based absolute -> crop-relative absolute
+        # cx_crop = cx_abs - x1
+        # cy_crop = cy_abs - y1
+        # # widths/heights unchanged in pixels
+        # w_crop = w_abs
+        # h_crop = h_abs
+
+        # # Re-normalize relative to crop size
+        # cx_norm = cx_crop / float(crop_w)
+        # cy_norm = cy_crop / float(crop_h)
+        # w_norm = w_crop / float(crop_w)
+        # h_norm = h_crop / float(crop_h)
+
+        # # Build new bboxes (xywh normalized to cropped image)
+        # new_bboxes = np.stack([cx_norm, cy_norm, w_norm, h_norm], axis=1).astype(np.float32)
+
+        # # Filter objects that are fully outside the crop or degenerate sizes
+        # # We consider an object valid if its center lies inside [0,1] and width/height > eps
+        # mask_keep = (cx_norm > 0) & (cx_norm < 1) & (cy_norm > 0) & (cy_norm < 1) & (w_norm > 1e-6) & (h_norm > 1e-6)
+        if keep_mask.sum() == 0:
+            # return empty label structures consistent with others
+            label["cls"] = label["cls"][:0]
+            label["bboxes"] = np.zeros((0, 4), dtype=np.float32)
+            label["segments"] = []
+            if "keypoints" in label and label["keypoints"] is not None:
+                label["keypoints"] = np.zeros((0, label["keypoints"].shape[1]), dtype=label["keypoints"].dtype)
+            # 3d zeros/empties if present
+            for k in ("labels_3d", "faces_3d", "has_3d_mask", "vehicle_mask", "face_vis_mask", "face_weight"):
+                if k in label:
+                    v = label[k]
+                    if isinstance(v, np.ndarray):
+                        label[k] = v[:0]
+                    else:
+                        label[k] = np.array([], dtype=type(v[0]) if len(v) else v.dtype)
+            return label
+        
+        # Build new clipped boxes and convert back to normalized xywh (relative to crop)
+        new_x1 = clip_x1[keep_mask]
+        new_y1 = clip_y1[keep_mask]
+        new_x2 = clip_x2[keep_mask]
+        new_y2 = clip_y2[keep_mask]
+
+        new_w = new_x2 - new_x1
+        new_h = new_y2 - new_y1
+        new_cx = new_x1 + new_w / 2.0
+        new_cy = new_y1 + new_h / 2.0
+
+        # Normalize to crop size
+        new_bboxes = np.stack(
+            [new_cx / float(crop_w), new_cy / float(crop_h), new_w / float(crop_w), new_h / float(crop_h)], axis=1
+        ).astype(np.float32)
+
+        # Apply mask to cls and bboxes
+        label["cls"] = label["cls"][keep_mask]
+        label["bboxes"] = new_bboxes #[mask_keep]
+        # segments: list of arrays, each array is (M,2) normalized or absolute depending on label["normalized"]
+        segs = label.get("segments", [])
+        if segs:
+            new_segs = []
+            for seg, keep in zip(segs, keep_mask):
+                if not keep:
+                    continue
+                seg_arr = np.array(seg, dtype=np.float32).reshape(-1, 2).copy()
+                if normalized_flag:
+                    # normalized to full image -> absolute -> crop -> normalize to crop
+                    seg_arr[:, 0] = seg_arr[:, 0] * full_w - x1
+                    seg_arr[:, 1] = seg_arr[:, 1] * full_h - y1
+                    seg_arr[:, 0] = seg_arr[:, 0] / float(crop_w)
+                    seg_arr[:, 1] = seg_arr[:, 1] / float(crop_h)
+                else:
+                    seg_arr[:, 0] = seg_arr[:, 0] - x1
+                    seg_arr[:, 1] = seg_arr[:, 1] - y1
+                    seg_arr[:, 0] = seg_arr[:, 0] / float(crop_w)
+                    seg_arr[:, 1] = seg_arr[:, 1] / float(crop_h)
+                new_segs.append(seg_arr)
+            label["segments"] = new_segs
+        else:
+            label["segments"] = []
+
+        # keypoints: numpy array with last dim >=2 (x,y,...)
+        if "keypoints" in label and label["keypoints"] is not None:
+            kp = np.array(label["keypoints"], dtype=np.float32)
+            if kp.size:
+                # kp shape: (n_kps, k, 2/3) or (n, nk*dim) depending on format; handle common case n x (nk*dim) stored as array
+                # Here we assume keypoints stored per-instance (n_instances, nk*dim) OR (n_instances, nk, dim)
+                kps = kp.copy()
+                if kps.ndim == 2 and (kps.shape[1] % 2 == 0 and kps.shape[1] > 2):  # flat format
+                    # reshape to (n_instances, nk, 2)
+                    nk = kps.shape[1] // 2
+                    kps = kps.reshape(kps.shape[0], nk, 2)
+                    flat_back = True
+                else:
+                    flat_back = False
+                # transform each point
+                for i in range(kps.shape[0]):
+                    for j in range(kps.shape[1]):
+                        x = kps[i, j, 0]
+                        y = kps[i, j, 1]
+                        if normalized_flag:
+                            x = x * full_w - x1
+                            y = y * full_h - y1
+                            x = x / float(crop_w)
+                            y = y / float(crop_h)
+                        else:
+                            x = x - x1
+                            y = y - y1
+                            x = x / float(crop_w)
+                            y = y / float(crop_h)
+                        kps[i, j, 0] = x
+                        kps[i, j, 1] = y
+                if flat_back:
+                    kps = kps.reshape(kps.shape[0], -1)
+                label["keypoints"] = kps[keep_mask]
+            else:
+                label["keypoints"] = np.zeros((0,), dtype=np.float32)
+
+        # 3D-handling: best-effort transform of first two elements (assumed x,y image coords normalized or absolute)
+        # labels_3d: (n_instances, 9) -> we attempt to transform first two entries as (cx, cy) normalized -> adjust them.
+        if "labels_3d" in label and isinstance(label["labels_3d"], np.ndarray) and label["labels_3d"].size:
+            l3d = label["labels_3d"].astype(np.float32).copy()
+            # If normalized_flag, we assume last two columns are normalized cx,cy
+            if l3d.shape[1] >= 2:
+                if normalized_flag:
+                    l3d[:, -2] = (l3d[:, -2] * full_w - x1) / float(crop_w)
+                    l3d[:, -1] = (l3d[:, -1] * full_h - y1) / float(crop_h)
+                else:
+                    l3d[:, -2] = (l3d[:, -2] - x1) / float(crop_w)
+                    l3d[:, -1] = (l3d[:, -1] - y1) / float(crop_h)
+            label["labels_3d"] = l3d[keep_mask]
+
+        # faces_3d: (n, 4, 7) -> try to transform index (3,4) values in last dim for each face vertex
+        if "faces_3d" in label and isinstance(label["faces_3d"], np.ndarray) and label["faces_3d"].size:
+            f3d = label["faces_3d"].astype(np.float32).copy()
+            # transform last-dim first two elements for all faces and vertices
+            if f3d.ndim == 3 and f3d.shape[-1] >= 2:
+                for idx in range(f3d.shape[0]):
+                    for v in range(f3d.shape[1]):
+                        x = f3d[idx, v, 3]
+                        y = f3d[idx, v, 4]
+                        if normalized_flag:
+                            x = (x * full_w - x1) / float(crop_w)
+                            y = (y * full_h - y1) / float(crop_h)
+                        else:
+                            x = (x - x1) / float(crop_w)
+                            y = (y - y1) / float(crop_h)
+                        f3d[idx, v, 3] = x
+                        f3d[idx, v, 4] = y
+            label["faces_3d"] = f3d[keep_mask]
+
+        # Masks / weights keep selection
+        for k in ("has_3d_mask", "vehicle_mask", "face_vis_mask", "face_weight"):
+            if k in label:
+                v = label[k]
+                if isinstance(v, np.ndarray):
+                    label[k] = v[keep_mask]
+
+        # Finally ensure label["normalized"] remains True and bbox_format kept as-is
+        label["normalized"] = True
+        return label
+
     def get_image_and_label(self, index: int) -> dict[str, Any]:
         """
         Get and return label information from the dataset.
@@ -407,13 +794,30 @@ class BaseDataset(Dataset):
         """
         label = deepcopy(self.labels[index])  # requires deepcopy() https://github.com/ultralytics/ultralytics/pull/1948
         label.pop("shape", None)  # shape is for rect, remove it
-        label["img"], label["ori_shape"], label["resized_shape"] = self.load_image(index)
+        # label["img"], label["ori_shape"], label["resized_shape"] = self.load_image(index)
+
+        # Check for per-image roi key
+        roi = label.pop("roi", None)
+        if roi is None:
+            roi = self.roi
+
+        # load_image now returns 4-tuple: resized_im, full_hw, crop_hw, resized_hw
+        im_resized, hw_full, hw_crop, hw_resized = self.load_image_with_ROI(index, rect_mode=True, roi=roi)
+        label["img"], label["ori_shape"], label["resized_shape"] = im_resized, hw_crop, hw_resized
+        # keep both full image original shape and crop shape if downstream code needs full
+        label["full_ori_shape"] = hw_full
+        label["crop_ori_shape"] = hw_crop
+
         label["ratio_pad"] = (
             label["resized_shape"][0] / label["ori_shape"][0],
             label["resized_shape"][1] / label["ori_shape"][1],
         )  # for evaluation
         if self.rect:
             label["rect_shape"] = self.batch_shapes[self.batch[index]]
+
+        # Adapt label coordinates to crop (and filter out instances fully outside crop)
+        label = self._adapt_label_for_roi(label, roi, hw_full, hw_crop)
+
         return self.update_labels_info(label)
 
     def __len__(self) -> int:

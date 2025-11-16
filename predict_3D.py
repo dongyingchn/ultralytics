@@ -171,25 +171,63 @@ def drawPointBox(img, imgW, imgH, rect_corners, colors, thickness=1):
             pass
     return img
 
+def yuv444_bt601_full_range2rgb(src, img_w, img_h):
+    src_seq = np.transpose(np.reshape(src, (-1,3)), (1,0)).astype(np.float32)
+    trans_mat = np.array([[1.000, 0.000, 1.402],[1.000, -0.344136, -0.714136],[1.000, 1.772, 0.000]])
+    bias = np.array([0, 128, 128])
+    bias_seq = np.reshape(np.repeat(bias, img_h*img_w), (3, img_h*img_w))
+    dst_seq = np.minimum(np.maximum(np.matmul(trans_mat, src_seq-bias_seq),0),255)
+    dst_seq = np.transpose(dst_seq, (1, 0))
+    dst = np.round(np.reshape(dst_seq, (img_h, img_w, 3))).astype(np.uint8)
+    return dst
+
 # Load a model
 pretrained_path = "/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect/train21/weights/best.pt"
+pretrained_path = "/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/minieye-driving-d4q-roi-2d2/weights/best.pt"
 model_version = pretrained_path.split('/')[-3]
 model = YOLO(pretrained_path)  # load a pretrained model, YOLO11n model
 
 # Run batched inference on a list of images
 
 img_path = "/mnt/mono3d/xdzhu_data/Mono3d/Mono3d_4face_2m_g1m3/driving/G1M3_FDL2232/20250912/images/G1M3_FDL2232_20250912_seq_53_camera4_002777_68656.jpg"
+img_path = "/mnt/mono3d/swji_data/mono3d_test/mono3d/driving/D4Q_51/20250712/images/D4Q_51_20250712_seq_95_camera4_000632_80721.jpg"
 img = cv2.imread(img_path)
 # img = cv2.resize(img, (960, 540))
 h_img, w_img, _ = img.shape
+
+ROI = [0, 160, 3840, 1696]  # x1,y1,x2,y2
+if ROI is not None:
+    h_roi, w_roi = ROI[3] - ROI[1], ROI[2] - ROI[0]
+else:
+    ROI = [0, 0, w_img, h_img]
+    h_roi, w_roi = img.shape[:2]
+
 results = model.predict(source=img, save=True, save_txt=True)  # return a list of Results objects
 
 calib_path = "/data1/dongying/Mono3d/G1M3_FDL2232/20250912/calib/L2_calib/camera4.json"
+calib_path = "/data1/dongying/Mono3d/D4Q_51/20250712/calib/L2_calib/camera4.json"
 intrinsic, extrinsic, distortion = read_calibs(calib_path)
 
-img_2d = img.copy()
-img_3d_base = img.copy()
-img_3d_face = img.copy()
+mode = 'yuv444'
+if mode == 'bgr':
+    img_2d = img.copy()
+elif mode == 'yuv444':
+    img_2d = yuv444_bt601_full_range2rgb(img.copy(), w_img, h_img)[..., ::-1].copy()
+img_3d_base = img_2d.copy()
+img_3d_face = img_2d.copy()
+
+class_names = ["car",  "tinycar", "bus", "van", "truck","tanker", "large_truck", "construction_vehicle","special_vehicle", "unknown", # 0-9
+            'pedestrian', 'bicycle', "bicyclist", # 10-12
+            "motorcycle", "motorcyclist", "tricycle", "tricyclist", # 13-16
+            'traffic_light_bbox', 'traffic_light_bulb',
+            'traffic_sign', 'animal', 'movable_object',
+            'warning_triangle', 'traffic_cone', 'water_barrier', 'crash_barrel',
+            'movable_barrier', 'bollard', 'sphere_bollard', 'cube_bollard',
+            'cylinder_bollard', 'construction_barrier', 'other_barrier',
+            'road_barrier_unknown', "wheel", "plate", "face"
+        ]
+# list to dict
+class_names = {i: class_names[i] for i in range(len(class_names))}
 
 # Process results list
 for result in results:
@@ -203,20 +241,20 @@ for result in results:
     cls = boxes.cls.detach().cpu().numpy().astype(int)  # class indices numpy array
     for i in range(len(boxes)):
 
-        if cls[i] not in [0,1,2,3]:
+        if cls[i] > 16:
             continue
 
         x, y, w, h = np.round(xywh[i]).astype(int)
         x1,y1,x2,y2 = np.round(xyxy[i]).astype(int)
         
-        proj_px = int(round(base3d['proj_offset_cell'][i][0] * w_img))
-        proj_pt = (proj_px, y)
+        proj_px = int(round(base3d['proj_offset_cell'][i][0] * w_roi))
+        proj_pt = (proj_px+ROI[0], y)
 
         cv2.rectangle(img_2d, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.putText(img_2d, 'cls:'+str(cls[i]), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (36,255,12), 2)
         # cv2.circle(img, proj_pt, 5, (0, 0, 255), 2)
 
-        pt_img_with_depth = np.array([[proj_px], [y], [1]]) * base3d['z3d'][i]
+        pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * base3d['z3d'][i]
         pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
 
         l3d, h3d, w3d = base3d['l3d'][i], base3d['h3d'][i], base3d['w3d'][i]
@@ -250,10 +288,10 @@ for result in results:
 
         if face_scores[face_idx] > 0.2:
 
-            proj_px = int(round(faces3d['proj_offset_cell'][i][face_idx][0] * w_img))
-            proj_pt = (proj_px, y)
+            proj_px = int(round(faces3d['proj_offset_cell'][i][face_idx][0] * w_roi))
+            proj_pt = (proj_px+ROI[0], y)
 
-            pt_img_with_depth = np.array([[proj_px], [y], [1]]) * faces3d['z3d'][i][face_idx]
+            pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * faces3d['z3d'][i][face_idx]
             pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
 
             size = faces3d['size'][i][face_idx]
