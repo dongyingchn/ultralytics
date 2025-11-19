@@ -954,13 +954,13 @@ class v8Detection3DLoss:
         # 3D loss 权重
         self.lambda_base3d = getattr(h, "lambda_base3d", 1.0)
         self.lambda_base3d_xyz = getattr(h, "lambda_base3d_xyz", self.hyp.cls)
-        self.lambda_base3d_proj = getattr(h, "lambda_base3d_proj", self.hyp.box)
+        self.lambda_base3d_proj = getattr(h, "lambda_base3d_proj", 1.0) #self.hyp.box)
         self.lambda_base3d_size = getattr(h, "lambda_base3d_size", self.hyp.cls)
         self.lambda_base3d_angle = getattr(h, "lambda_base3d_angle", self.hyp.cls * 1.2)
         self.lambda_base3d_cutcls = getattr(h, "lambda_base3d_cutcls", self.hyp.cls)
         
         self.lambda_faces_xyz = getattr(h, "lambda_faces_xyz", 0.2)
-        self.lambda_faces_proj = getattr(h, "lambda_faces_proj", self.hyp.box * 1.2)
+        self.lambda_faces_proj = getattr(h, "lambda_faces_proj", 1.0) #self.hyp.box * 1.2)
         self.lambda_faces_size = getattr(h, "lambda_faces_size", self.hyp.cls)
         self.lambda_faces_vis = getattr(h, "lambda_faces_vis", 0.15)
         self.lambda_faces_score = getattr(h, "lambda_faces_score", 1.0)
@@ -1087,10 +1087,10 @@ class v8Detection3DLoss:
             return F.smooth_l1_loss(pred_angle, gt_angle, reduction="mean")
 
     def cutcls_loss(self, pred_cutcls: torch.Tensor, gt_faces: torch.Tensor) -> torch.Tensor:
-        f_c = torch.sum(gt_faces[:, 0, [0,1,2,4,5]],dim=1)==-4
-        t_c = torch.sum(gt_faces[:, 1, [0,1,2,4,5]],dim=1)==-4
-        l_c = torch.sum(gt_faces[:, 2, [0,1,2,4,5]],dim=1)==-4
-        r_c = torch.sum(gt_faces[:, 3, [0,1,2,4,5]],dim=1)==-4
+        f_c = torch.sum(gt_faces[:, 0, [0,1,2,5,6]],dim=1)==-4
+        t_c = torch.sum(gt_faces[:, 1, [0,1,2,5,6]],dim=1)==-4
+        l_c = torch.sum(gt_faces[:, 2, [0,1,2,5,6]],dim=1)==-4
+        r_c = torch.sum(gt_faces[:, 3, [0,1,2,5,6]],dim=1)==-4
 
         cut_cls_label = torch.zeros_like(f_c).float()
         cut_cls_label[torch.where(t_c & l_c & r_c)] = 1  ##cut_in 
@@ -1254,10 +1254,10 @@ class v8Detection3DLoss:
 
                 l_xyz = self.L1loss(pred_base[m, 0], gt_base_pos_norm[m, 2]) / m_sum
                 
-                # gt_proj = gt_base_pos[:, 7:9]                  # (P,2) 归一化GT
-                # gt_proj_px = gt_proj * imgsz[[1, 0]]           # (P,2) 像素GT
-                # gt_proj_off  = (gt_proj_px - ap_px) / st_pos   # (P,2) 偏移归一到 cell
-                gt_proj_off = gt_base_pos[:, 7:9]
+                gt_proj = gt_base_pos[:, 7:9]                  # (P,2) 归一化GT
+                gt_proj_px = gt_proj * imgsz[[1, 0]]           # (P,2) 像素GT
+                gt_proj_off  = (gt_proj_px - ap_px) / st_pos   # (P,2) 偏移归一到 cell
+                # gt_proj_off = gt_base_pos[:, 7:9]
                 l_proj = self.L1loss(pred_base[m, 1:2].tanh()*6, gt_proj_off[m, :1]) / m_sum
 
                 # def stats(x): return (x.mean().item(), x.std().item(), x.min().item(), x.max().item())
@@ -1273,7 +1273,11 @@ class v8Detection3DLoss:
                 #             self.lambda_base3d_angle*l_rot
             
             else:
-                base3d_loss = torch.zeros(1, device=pred3d_pos.device).sum()
+                l_xyz = torch.zeros(1, device=pred3d_pos.device)
+                l_proj = torch.zeros(1, device=pred3d_pos.device)
+                l_lwh = torch.zeros(1, device=pred3d_pos.device)
+                l_rot_cls = torch.zeros(1, device=pred3d_pos.device)
+                l_rot_reg = torch.zeros(1, device=pred3d_pos.device)
 
             # ---- 车辆 4 面：仅在 vehicle 上；几何/投影只监督可见(is_vis)面并以 score 作为权重
             vm = vehicle_pos
@@ -1289,9 +1293,10 @@ class v8Detection3DLoss:
 
                 valid_face = vis * w
 
-                g_faces[:, :, 0] = g_faces[:, :, 1] / 35.0
-                g_faces[:, :, 1] = g_faces[:, :, 0] / 5.0
-                g_faces[:, :, 2] = (g_faces[:, :, 2] - 40) / 40
+                g_faces_norm = torch.zeros_like(g_faces)
+                g_faces_norm[:, :, 0] = g_faces[:, :, 0] / 35.0
+                g_faces_norm[:, :, 1] = g_faces[:, :, 1] / 5.0
+                g_faces_norm[:, :, 2] = (g_faces[:, :, 2] - 40) / 40
 
                 gt_base = gt_base_pos[vm]  # (Pv, 9)
                 gt_faces_with_size = torch.zeros((g_faces.shape[0], g_faces.shape[1], 9), device=g_faces.device, dtype=g_faces.dtype)
@@ -1300,13 +1305,13 @@ class v8Detection3DLoss:
                 gt_faces_with_size[:, 2:, 7:9] = gt_base[:, 3:5].unsqueeze(1).repeat(1, 2, 1)
 
                 # xyz (Pv,4,3) -> mean over last -> (Pv,4)
-                l_xyz_face = self.L1loss_noredu(p_faces[:, :, 0], g_faces[:, :, 2])
+                l_xyz_face = self.L1loss_noredu(p_faces[:, :, 0], g_faces_norm[:, :, 2])
                 
                 # proj (Pv,4,2) -> (Pv,4)
-                gt_proj_face_off = gt_faces_pos[:, :, 3:5]                                        # (P,4,2) 像素GT
-                # gt_proj_face = gt_faces_pos[:, :, 3:5]                                              # (P,4,2) 归一化GT
-                # gt_proj_face_px = gt_proj_face * imgsz[[1, 0]]                                      # (P,4,2) 像素GT
-                # gt_proj_face_off = (gt_proj_face_px - ap_px[:, None, :]) / st_pos[:, None, :]       # (P,4,2)
+                # gt_proj_face_off = gt_faces_pos[:, :, 3:5]                                        # (P,4,2) 像素GT
+                gt_proj_face = gt_faces_pos[:, :, 3:5]                                              # (P,4,2) 归一化GT
+                gt_proj_face_px = gt_proj_face * imgsz[[1, 0]]                                      # (P,4,2) 像素GT
+                gt_proj_face_off = (gt_proj_face_px - ap_px[:, None, :]) / st_pos[:, None, :]       # (P,4,2)
                 l_proj_face = self.L1loss_noredu(p_faces[:, :, 1:2].tanh()*6, gt_proj_face_off[vm,:, :1]).mean(-1)
 
                 # def stats(x): return (x.mean().item(), x.std().item(), x.min().item(), x.max().item())
@@ -1332,24 +1337,17 @@ class v8Detection3DLoss:
                 faces_xyz = (l_xyz_face * valid_face).sum() / denom
                 faces_proj = (l_proj_face * valid_face).sum() / denom
                 faces_size = (l_size_face * valid_face).sum() / denom
-                faces_vis = (l_vis_face * valid_face).sum() / denom
+                # faces_vis = (l_vis_face * valid_face).sum() / denom
+                faces_vis = l_vis_face.mean()
                 # faces_score = (l_score_face * vis).sum() / denom
-
-                # faces_loss = (
-                #     self.lambda_faces_xyz * faces_xyz +
-                #     self.lambda_faces_proj * faces_proj +
-                #     self.lambda_faces_size * faces_size + 
-                #     self.lambda_faces_vis * faces_vis
-                #     # self.lambda_faces_score * faces_score
-                # )
+                
             else:
-                faces_loss = torch.zeros(1, device=pred3d_pos.device).sum()
-                l_cutcls = torch.zeros(1, device=pred3d_pos.device).sum()
-
-            # loss_vec[3] = self.lambda_base3d * base3d_loss
-            # loss_vec[4] = faces_loss
-            # loss_vec[5] = l_cutcls
-
+                faces_xyz = torch.zeros(1, device=pred3d_pos.device)
+                faces_proj = torch.zeros(1, device=pred3d_pos.device)
+                faces_size = torch.zeros(1, device=pred3d_pos.device)
+                faces_vis = torch.zeros(1, device=pred3d_pos.device)
+                l_cutcls = torch.zeros(1, device=pred3d_pos.device)
+            
             loss_vec[3] = self.lambda_base3d_xyz * l_xyz
             loss_vec[4] = self.lambda_base3d_proj * l_proj
             loss_vec[5] = self.lambda_base3d_size * l_lwh

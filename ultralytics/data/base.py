@@ -94,6 +94,8 @@ class BaseDataset(Dataset):
         fraction: float = 1.0,
         channels: int = 3,
         roi: tuple[int, int, int, int] | None = None,  # NEW: global roi (x1,y1,x2,y2) or None
+        roi_policy: Any | None = None, 
+        output_shape: tuple[int,int] | None = None
     ):
         """
         Initialize BaseDataset with given configuration and options.
@@ -123,7 +125,11 @@ class BaseDataset(Dataset):
         self.fraction = fraction
         self.channels = channels
         self.cv2_flag = cv2.IMREAD_GRAYSCALE if channels == 1 else cv2.IMREAD_COLOR
+
         self.roi = roi  # store global ROI
+        self.roi_policy = roi_policy
+        self.output_shape = output_shape
+
         self.im_files = self.get_img_files(self.img_path)
         self.labels = self.get_labels()
         self.update_labels(include_class=classes)  # single_cls and include_class
@@ -140,16 +146,41 @@ class BaseDataset(Dataset):
         self.buffer = []  # buffer size = batch size
         self.max_buffer_length = min((self.ni, self.batch_size * 8, 1000)) if self.augment else 0
 
-        # Cache images (options are cache = True, False, None, "ram", "disk")
-        self.ims, self.im_hw0, self.im_hw = [None] * self.ni, [None] * self.ni, [None] * self.ni
+        # # Cache images (options are cache = True, False, None, "ram", "disk")
+        # self.ims, self.im_hw0, self.im_hw = [None] * self.ni, [None] * self.ni, [None] * self.ni
+        # self.npy_files = [Path(f).with_suffix(".npy") for f in self.im_files]
+        # self.cache = cache.lower() if isinstance(cache, str) else "ram" if cache is True else None
+        # if self.cache == "ram" and self.check_cache_ram():
+        #     if hyp.deterministic:
+        #         LOGGER.warning(
+        #             "cache='ram' may produce non-deterministic training results. "
+        #             "Consider cache='disk' as a deterministic alternative if your disk space allows."
+        #         )
+        #     self.cache_images()
+        # elif self.cache == "disk" and self.check_cache_disk():
+        #     self.cache_images()
+
+        # Cache images (options are cache = True, False, None, "ram", "ram_full", "disk")
+        self.ims, self.ims_full = [None] * self.ni, [None] * self.ni
+        self.im_hw0, self.im_hw = [None] * self.ni, [None] * self.ni
         self.npy_files = [Path(f).with_suffix(".npy") for f in self.im_files]
         self.cache = cache.lower() if isinstance(cache, str) else "ram" if cache is True else None
+
+        # If using dynamic ROI policy, avoid 'ram' (would lock first crop); prefer 'ram_full' or 'disk'
+        if self.roi_policy is not None and self.cache == "ram":
+            LOGGER.info(
+                f"{self.prefix}Dynamic ROI policy detected with cache='ram'. Switching to cache='ram_full' to keep randomness."
+            )
+            self.cache = "ram_full"
+
         if self.cache == "ram" and self.check_cache_ram():
-            if hyp.deterministic:
+            if getattr(hyp, "deterministic", False):
                 LOGGER.warning(
                     "cache='ram' may produce non-deterministic training results. "
                     "Consider cache='disk' as a deterministic alternative if your disk space allows."
                 )
+            self.cache_images()
+        elif self.cache == "ram_full" and self.check_cache_ram():
             self.cache_images()
         elif self.cache == "disk" and self.check_cache_disk():
             self.cache_images()
@@ -234,6 +265,28 @@ class BaseDataset(Dataset):
             if self.single_cls:
                 self.labels[i]["cls"][:, 0] = 0
 
+    def _load_full_image(self, i: int) -> np.ndarray:
+        """
+        Load full image (no crop/resize), using RAM cache if available or disk .npy cache.
+        """
+        im_full, f, fn = self.ims_full[i], self.im_files[i], self.npy_files[i]
+        if im_full is not None:
+            return im_full
+        if fn.exists():  # load npy-cached full image
+            try:
+                im_full = np.load(fn)
+            except Exception as e:
+                LOGGER.warning(f"{self.prefix}Removing corrupt *.npy image file {fn} due to: {e}")
+                Path(fn).unlink(missing_ok=True)
+                im_full = imread(f, flags=self.cv2_flag)
+        else:
+            im_full = imread(f, flags=self.cv2_flag)
+        if im_full is None:
+            raise FileNotFoundError(f"Image Not Found {f}")
+        if im_full.ndim == 2:
+            im_full = im_full[..., None]
+        return im_full
+
     def load_image(self, i: int, rect_mode: bool = True) -> tuple[np.ndarray, tuple[int, int], tuple[int, int]]:
         """
         Load an image from dataset index 'i'.
@@ -288,7 +341,77 @@ class BaseDataset(Dataset):
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
 
-    def load_image_with_ROI(self, i: int, rect_mode: bool = True, roi: tuple[int, int, int, int] | None = None) -> tuple:
+    def load_image_with_ROI(
+        self, i: int, rect_mode: bool = True, roi: tuple[int, int, int, int] | None = None
+    ) -> tuple[np.ndarray, tuple[int, int], tuple[int, int], tuple[int, int]]:
+        """
+        Load an image from dataset index 'i' with optional ROI cropping and resizing.
+
+        Returns:
+            (im_resized, (h0_full, w0_full), (h0_crop, w0_crop), (h_resized, w_resized))
+        """
+        # If caching original full images, start from full
+        if self.cache == "ram_full":
+            im_full = self._load_full_image(i)
+        else:
+            # If cropped+resized image is cached in RAM and valid, return the cached triplet extended to 4-tuple
+            im_cached = self.ims[i]
+            if im_cached is not None:
+                # self.im_hw0[i] holds the 'crop original' size; self.im_hw[i] is resized size
+                return im_cached, self.im_hw0[i], self.im_hw[i], self.im_hw[i]
+
+            # Otherwise load full from disk (or .npy)
+            im_full = self._load_full_image(i)
+
+        h0_full, w0_full = im_full.shape[:2]
+
+        # Apply ROI crop if provided
+        if roi is None:
+            im_crop = im_full
+            h0_crop, w0_crop = h0_full, w0_full
+            x1 = y1 = 0  # not used further but define to keep static analyzers happy
+        else:
+            x1, y1, x2, y2 = (int(round(v)) for v in roi)
+            # clip to image bounds
+            x1 = max(0, min(x1, w0_full - 1))
+            y1 = max(0, min(y1, h0_full - 1))
+            x2 = max(x1 + 1, min(x2, w0_full))
+            y2 = max(y1 + 1, min(y2, h0_full))
+            im_crop = im_full[y1:y2, x1:x2]
+            h0_crop, w0_crop = im_crop.shape[:2]
+
+        # Resize
+        if self.output_shape is not None:
+            W, H = int(self.output_shape[0]), int(self.output_shape[1])
+            im_resized = cv2.resize(im_crop, (W, H), interpolation=cv2.INTER_LINEAR)
+        else:
+            if rect_mode:  # resize long side to imgsz while maintaining aspect ratio
+                r = self.imgsz / max(h0_crop, w0_crop)
+                if r != 1:
+                    w, h = (min(math.ceil(w0_crop * r), self.imgsz), min(math.ceil(h0_crop * r), self.imgsz))
+                    im_resized = cv2.resize(im_crop, (w, h), interpolation=cv2.INTER_LINEAR)
+                else:
+                    im_resized = im_crop
+            elif not (h0_crop == w0_crop == self.imgsz):  # stretch to square imgsz
+                im_resized = cv2.resize(im_crop, (self.imgsz, self.imgsz), interpolation=cv2.INTER_LINEAR)
+            else:
+                im_resized = im_crop
+
+        if im_resized.ndim == 2:
+            im_resized = im_resized[..., None]
+
+        # Cache cropped+resized only in 'ram' mode (not in 'ram_full', to keep randomness)
+        if self.augment and self.cache == "ram":
+            self.ims[i], self.im_hw0[i], self.im_hw[i] = im_resized, (h0_crop, w0_crop), im_resized.shape[:2]
+            self.buffer.append(i)
+            if 1 < len(self.buffer) >= self.max_buffer_length:  # prevent empty buffer
+                j = self.buffer.pop(0)
+                if self.cache != "ram":
+                    self.ims[j], self.im_hw0[j], self.im_hw[j] = None, None, None
+
+        return im_resized, (h0_full, w0_full), (h0_crop, w0_crop), im_resized.shape[:2]
+
+    def load_image_with_ROI_v1(self, i: int, rect_mode: bool = True, roi: tuple[int, int, int, int] | None = None) -> tuple:
         """
         Load an image from dataset index 'i'.
 
@@ -360,6 +483,54 @@ class BaseDataset(Dataset):
         return self.ims[i], self.im_hw0[i], self.im_hw[i], self.im_hw[i]
 
     def cache_images(self) -> None:
+        """Cache images to memory or disk for faster training."""
+        b, gb = 0, 1 << 30  # bytes of cached images, bytes per gigabytes
+
+        if self.cache == "disk":
+            fcn, storage = (self.cache_images_to_disk, "Disk")
+            with ThreadPool(NUM_THREADS) as pool:
+                results = pool.imap(fcn, range(self.ni))
+                pbar = TQDM(enumerate(results), total=self.ni, disable=LOCAL_RANK > 0)
+                for i, _ in pbar:
+                    b += self.npy_files[i].stat().st_size if self.npy_files[i].exists() else 0
+                    pbar.desc = f"{self.prefix}Caching images ({b / gb:.1f}GB {storage})"
+                pbar.close()
+            return
+
+        if self.cache == "ram_full":
+            fcn, storage = (self._load_full_image, "RAM(full)")
+            with ThreadPool(NUM_THREADS) as pool:
+                results = pool.imap(fcn, range(self.ni))
+                pbar = TQDM(enumerate(results), total=self.ni, disable=LOCAL_RANK > 0)
+                for i, im_full in pbar:
+                    self.ims_full[i] = im_full
+                    b += self.ims_full[i].nbytes
+                    pbar.desc = f"{self.prefix}Caching images ({b / gb:.1f}GB {storage})"
+                pbar.close()
+            return
+
+        if self.cache == "ram":
+            storage = "RAM"
+            # Build per-index ROI if global ROI is given; avoid dynamic roi_policy here
+            def _load_with_roi(idx: int):
+                roi_i = None
+                # If per-label roi exists use it, else global self.roi; ignore dynamic roi_policy at caching time
+                if isinstance(self.labels[idx], dict):
+                    roi_i = self.labels[idx].get("roi", None)
+                roi_i = self.roi if roi_i is None else roi_i
+                return self.load_image_with_ROI(idx, rect_mode=True, roi=roi_i)
+
+            with ThreadPool(NUM_THREADS) as pool:
+                results = pool.imap(_load_with_roi, range(self.ni))
+                pbar = TQDM(enumerate(results), total=self.ni, disable=LOCAL_RANK > 0)
+                for i, x in pbar:
+                    im_resized, hw_full, hw_crop, hw_resized = x
+                    self.ims[i], self.im_hw0[i], self.im_hw[i] = im_resized, hw_crop, hw_resized
+                    b += self.ims[i].nbytes
+                    pbar.desc = f"{self.prefix}Caching images ({b / gb:.1f}GB {storage})"
+                pbar.close()
+
+    def cache_images_v1(self) -> None:
         """Cache images to memory or disk for faster training."""
         b, gb = 0, 1 << 30  # bytes of cached images, bytes per gigabytes
         fcn, storage = (self.cache_images_to_disk, "Disk") if self.cache == "disk" else (self.load_image_with_ROI, "RAM") #(self.load_image, "RAM")
@@ -471,8 +642,73 @@ class BaseDataset(Dataset):
 
     #     self.batch_shapes = np.ceil(np.array(shapes) * self.imgsz / self.stride + self.pad).astype(int) * self.stride
     #     self.batch = bi  # batch index of image
-
     def set_rectangle(self) -> None:
+        """Set the shape of bounding boxes for YOLO detections as rectangles."""
+        bi = np.floor(np.arange(self.ni) / self.batch_size).astype(int)  # batch index
+        nb = bi[-1] + 1  # number of batches
+
+        # Decide effective shape per image:
+        # Priority for shape estimation:
+        # - If dynamic roi_policy and output_shape provided -> use output_shape (H,W) for all
+        # - Else if per-label roi/global roi -> use ROI crop shape
+        # - Else fall back to label["shape"] (full image)
+        s_list = []
+        if self.roi_policy is not None and self.output_shape is not None:
+            # Use unified output shape
+            H, W = int(self.output_shape[1]), int(self.output_shape[0])  # output_shape is (W,H)
+            s_list = [(H, W) for _ in range(self.ni)]
+            for i in range(self.ni):
+                self.labels[i]["shape"] = (H, W)
+        else:
+            for i in range(len(self.labels)):
+                label = self.labels[i]
+                orig_shape = label.get("shape", None)  # (h, w) of full image
+                if orig_shape is None:
+                    full_h, full_w = self.imgsz, self.imgsz
+                else:
+                    full_h, full_w = int(orig_shape[0]), int(orig_shape[1])
+
+                # determine roi: per-image overrides global
+                roi = label.get("roi", None) if isinstance(label, dict) else None
+                if roi is None:
+                    roi = getattr(self, "roi", None)
+
+                if roi is None:
+                    crop_h, crop_w = full_h, full_w
+                else:
+                    x1, y1, x2, y2 = (int(round(v)) for v in roi)
+                    x1 = max(0, min(x1, full_w - 1))
+                    y1 = max(0, min(y1, full_h - 1))
+                    x2 = max(x1 + 1, min(x2, full_w))
+                    y2 = max(y1 + 1, min(y2, full_h))
+                    crop_w = max(1, x2 - x1)
+                    crop_h = max(1, y2 - y1)
+
+                # update label["shape"] to be the crop shape so later logic sees cropped sizes
+                self.labels[i]["shape"] = (int(crop_h), int(crop_w))
+                s_list.append((int(crop_h), int(crop_w)))
+
+        s = np.array(s_list)  # hw
+        ar = s[:, 0] / s[:, 1]  # aspect ratio
+        irect = ar.argsort()
+        self.im_files = [self.im_files[i] for i in irect]
+        self.labels = [self.labels[i] for i in irect]
+        ar = ar[irect]
+
+        # Set training image shapes
+        shapes = [[1, 1]] * nb
+        for i in range(nb):
+            ari = ar[bi == i]
+            mini, maxi = ari.min(), ari.max()
+            if maxi < 1:
+                shapes[i] = [maxi, 1]
+            elif mini > 1:
+                shapes[i] = [1, 1 / mini]
+
+        self.batch_shapes = np.ceil(np.array(shapes) * self.imgsz / self.stride + self.pad).astype(int) * self.stride
+        self.batch = bi  # batch index of image
+
+    def set_rectangle_v1(self) -> None:
         """Set the shape of bounding boxes for YOLO detections as rectangles."""
         bi = np.floor(np.arange(self.ni) / self.batch_size).astype(int)  # batch index
         nb = bi[-1] + 1  # number of batches
@@ -782,7 +1018,75 @@ class BaseDataset(Dataset):
         label["normalized"] = True
         return label
 
+    def _get_full_hw(self, index: int) -> tuple[int, int]:
+        """
+        Helper to fetch full original image size (h,w) for index, using caches if available.
+        """
+        if self.cache == "ram_full" and self.ims_full[index] is not None:
+            im = self.ims_full[index]
+            return im.shape[0], im.shape[1]
+        # Try .npy cache to avoid decoding if present
+        fn = self.npy_files[index]
+        if fn.exists():
+            try:
+                im = np.load(fn, mmap_mode="r")
+                return im.shape[0], im.shape[1]
+            except Exception:
+                pass
+        # Fallback to imread
+        im = imread(self.im_files[index], flags=self.cv2_flag)
+        if im is None:
+            raise FileNotFoundError(f"Image Not Found {self.im_files[index]}")
+        return im.shape[0], im.shape[1]
+
     def get_image_and_label(self, index: int) -> dict[str, Any]:
+        """
+        Get and return label information from the dataset.
+
+        Args:
+            index (int): Index of the image to retrieve.
+
+        Returns:
+            (dict[str, Any]): Label dictionary with image and metadata.
+        """
+        label = deepcopy(self.labels[index])  # requires deepcopy()
+        label.pop("shape", None)  # shape is for rect, remove it
+
+        # Determine ROI with priority: per-image 'roi' > roi_policy > global self.roi
+        roi = label.pop("roi", None)
+        if roi is None:
+            if self.roi_policy is not None:
+                h_full, w_full = self._get_full_hw(index)
+                # Policy expects (W,H)
+                try:
+                    roi = self.roi_policy.get_roi((w_full, h_full), meta=label)
+                except Exception as e:
+                    LOGGER.warning(f"{self.prefix}roi_policy.get_roi failed at index {index}: {e}. Falling back to global roi.")
+                    roi = self.roi
+            else:
+                roi = self.roi
+
+        # Load with ROI; returns resized image and shapes
+        im_resized, hw_full, hw_crop, hw_resized = self.load_image_with_ROI(index, rect_mode=True, roi=roi)
+
+        # Populate label dict
+        label["img"], label["ori_shape"], label["resized_shape"] = im_resized, hw_crop, hw_resized
+        label["full_ori_shape"] = hw_full
+        label["crop_ori_shape"] = hw_crop
+
+        label["ratio_pad"] = (
+            label["resized_shape"][0] / label["ori_shape"][0],
+            label["resized_shape"][1] / label["ori_shape"][1],
+        )  # for evaluation
+        if self.rect:
+            label["rect_shape"] = self.batch_shapes[self.batch[index]]
+
+        # Adapt label coordinates to crop (and filter out instances fully outside crop)
+        label = self._adapt_label_for_roi(label, roi, hw_full, hw_crop)
+
+        return self.update_labels_info(label)
+
+    def get_image_and_label_v1(self, index: int) -> dict[str, Any]:
         """
         Get and return label information from the dataset.
 

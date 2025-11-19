@@ -586,21 +586,34 @@ class Detect3D(Detect):
             except Exception:
                 ang_prob = ang_logits  # fallback
 
-            # class-center angles used in training encoding (heuristic / mirror of loss.py):
-            # we use class-centers [0, pi/2, -pi/2, pi] as a reasonable inverse mapping;
-            # if your training used different centers replace accordingly.
-            centers = torch.tensor([0.0, math.pi / 2.0, -math.pi / 2.0, math.pi], device=b.device, dtype=b.dtype)
+            
             # residuals are tanh-scaled roughly in (-1,1). Choose residual scale (rad) as pi/4 (tunable)
             res_scale = getattr(self, "decode_angle_residual_scale", (math.pi / 2.0))
             # expected angle = sum_k prob_k * (center_k + tanh(res_k)*res_scale)
             res_tanh = torch.tanh(ang_res) * res_scale  # (B,N,4)
-            centers = centers.view(1, 1, 4)
-            angle_components = centers + res_tanh  # (B,N,4)
+
+            # # class-center angles used in training encoding (heuristic / mirror of loss.py):
+            # # we use class-centers [0, pi/2, -pi/2, pi] as a reasonable inverse mapping;
+            # # if your training used different centers replace accordingly.
+            # centers = torch.tensor([0.0, math.pi / 2.0, -math.pi / 2.0, math.pi], device=b.device, dtype=b.dtype)
+            # centers = centers.view(1, 1, 4)
+
+            angle0 = res_tanh[..., 0]                         # 类0: 0 + res0
+            angle1 = res_tanh[..., 1] + math.pi / 2.0        # 类1: +π/2 + res1
+            angle2 = res_tanh[..., 2] - math.pi / 2.0        # 类2: -π/2 + res2
+            res3  = res_tanh[..., 3]
+            # 类3: 根据残差符号决定加/减 π，完全对齐方式一
+            angle3 = torch.where(res3 > 0, res3 - math.pi, res3 + math.pi)
+
+            angle_components = torch.stack([angle0, angle1, angle2, angle3], dim=-1)  # (B,N,4)
+            # angle_components = centers + res_tanh  # (B,N,4)
             # weighted sum across classes
             # decoded_angle = (ang_prob * angle_components).sum(dim=-1)  # (B,N)
             index = torch.argmax(ang_prob, dim=-1)  # (B,N)
             decoded_angle = angle_components.gather(-1, index.unsqueeze(-1)).squeeze(-1)  # (B,N)
             base_decoded["rot_y"] = decoded_angle  # radians
+            base_decoded["rot_y_cls"] = ang_prob  # (B,N,4)
+            base_decoded["rot_y_res"] = res_tanh # (B,N,4)
 
             # cutcls logits (3 classes) indices 14:17 -> probabilities
             cutcls_logits = b[..., 14:17] if base_dims >= 17 else None
@@ -644,7 +657,7 @@ class Detect3D(Detect):
                     ap = ap.reshape(-1, 2)
                 ap_t = ap.view(1, -1, 2)
                 st_t = st.view(1, -1, 1)
-                proj_px = ap_t + base_decoded["proj_offset_cell"] * st_t  # (B,N,2)
+                proj_px = (ap_t + base_decoded["proj_offset_cell"]) * st_t  # (B,N,2)
                 base_decoded["proj_px"] = proj_px
             else:
                 # leave offsets in cell units
@@ -680,7 +693,7 @@ class Detect3D(Detect):
                     ap = ap.reshape(-1, 2)
                 ap_t = ap.view(1, -1, 2).unsqueeze(2)  # (1, N, 1, 2)
                 st_t = st.view(1, -1, 1).unsqueeze(2)  # (1, N, 1, 1)
-                proj_px_face = ap_t + fproj_off * st_t  # (B, N, num_faces, 2)
+                proj_px_face = (ap_t + fproj_off) * st_t  # (B, N, num_faces, 2)
                 faces_decoded["proj_px"] = proj_px_face
 
         # 5. Prepare outputs, optionally convert to numpy

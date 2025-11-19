@@ -4,6 +4,10 @@ from ultralytics import YOLO
 import os
 import json
 import numpy as np
+
+import random
+random.seed(42)
+
 def get_rot_mat_and_trans(calib_dict):
     su = np.sin(calib_dict['roll'] * np.pi / 180)
     cu = np.cos(calib_dict['roll'] * np.pi / 180)
@@ -83,6 +87,24 @@ def rotation_3d_in_axis(points, angles, axis=0):
 
     return np.einsum('ij, jk', points, rot_mat_T)
 
+def rotation_3d_in_axis_v2(points: np.ndarray, angle: float, axis: int = 0) -> np.ndarray:
+    """
+    Rotate 3D points around a principal axis by a single angle.
+    points: (N,3)
+    angle: scalar radians
+    axis: 0-x, 1-y, 2-z
+    """
+    s, c = np.sin(angle), np.cos(angle)
+    if axis == 0:  # x
+        rot = np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=np.float64)
+    elif axis == 1:  # y
+        rot = np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]], dtype=np.float64)
+    elif axis in (2, -1):  # z
+        rot = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float64)
+    else:
+        raise ValueError(f"axis should be in [0, 1, 2], got {axis}")
+    return points @ rot.T
+
 def cam_corners_front_rear(pred3d, facetype):
     dims = pred3d[3:6]
     corners_norm = np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)
@@ -111,6 +133,35 @@ def cam_corners_front_rear(pred3d, facetype):
     corners = rotation_3d_in_axis(corners, pred3d[6], axis=1)
     corners += pred3d[:3].reshape(1, 3)
     return corners
+
+def img_cam_kb(img_corners,cam_intrinsic,distort_param):   # nx2
+    ones_col = np.ones((img_corners.shape[0], 1), dtype=np.float32)
+    img_corners = np.concatenate((img_corners.astype(np.float32),ones_col),axis=-1)  # （n,3）
+    k1 = distort_param[0]
+    k2 = distort_param[1]
+    k3 = distort_param[2]
+    k4 = distort_param[3]
+    points = np.dot(np.linalg.inv(cam_intrinsic),img_corners.T).T          # (2073600, 3)
+    xp = points[:,0] # n
+    yp = points[:,1] # n
+    thetaD = np.sqrt(xp*xp+yp*yp)
+    cam_theta,femask = [],[]
+    theta = thetaD
+    for i in range(20):
+        ftheta = theta * (1 + k1 * theta**2 + k2 * theta**4 + k3 * theta**6 + k4 * theta**8) - thetaD
+        ftheta_dao = 1 + 3 * k1 * theta**2 + 5 * k2 * theta**4 + 7 * k3 * theta**6 + 9 * k4 * theta**8
+        theta = theta - ftheta/ftheta_dao
+        if abs(ftheta)<0.0000001:
+            break
+        # print(ftheta)
+    
+    r = np.tan(theta)
+    ###################################
+    normx = xp * r / thetaD # 4,H,W
+    normy = yp * r / thetaD
+    ones_col = np.ones((normy.shape[0], 1), dtype=np.float32)
+    x3dy3d = np.concatenate((normx.reshape((-1,1)),normy.reshape((-1,1)),ones_col),axis=-1)
+    return x3dy3d[0,0], x3dy3d[0,1]
 
 def cam_img_kb(x, y, z, cam_intrinsic, distort_param):
     # objp=np.array([x/z,y/z,1]).reshape(1,-1,3)
@@ -182,154 +233,211 @@ def yuv444_bt601_full_range2rgb(src, img_w, img_h):
     return dst
 
 # Load a model
+model_version = "minieye-driving-d4q-roi-multi_res-combined2"
+model_version = "minieye-driving-d4q-roi-multi_res-combined-proj_loss-face_vis"
+
 pretrained_path = "/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect/train21/weights/best.pt"
-pretrained_path = "/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/minieye-driving-d4q-roi-2d2/weights/best.pt"
-model_version = pretrained_path.split('/')[-3]
+pretrained_path = f"/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/{model_version}/weights/best.pt"
+# model_version = pretrained_path.split('/')[-3]
 model = YOLO(pretrained_path)  # load a pretrained model, YOLO11n model
 
 # Run batched inference on a list of images
 
-img_path = "/mnt/mono3d/xdzhu_data/Mono3d/Mono3d_4face_2m_g1m3/driving/G1M3_FDL2232/20250912/images/G1M3_FDL2232_20250912_seq_53_camera4_002777_68656.jpg"
-img_path = "/mnt/mono3d/swji_data/mono3d_test/mono3d/driving/D4Q_51/20250712/images/D4Q_51_20250712_seq_95_camera4_000632_80721.jpg"
-img = cv2.imread(img_path)
-# img = cv2.resize(img, (960, 540))
-h_img, w_img, _ = img.shape
+output_dir = f"./output/detect_{model_version}_val"
+os.makedirs(output_dir, exist_ok=True)
 
-ROI = [0, 160, 3840, 1696]  # x1,y1,x2,y2
-if ROI is not None:
-    h_roi, w_roi = ROI[3] - ROI[1], ROI[2] - ROI[0]
-else:
-    ROI = [0, 0, w_img, h_img]
-    h_roi, w_roi = img.shape[:2]
+img_list_file = "./train_data/D4Q/val_20251114_21732.txt"
+with open(img_list_file, 'r') as f:
+    img_list = f.read().splitlines()
 
-results = model.predict(source=img, save=True, save_txt=True)  # return a list of Results objects
+vis_2d = True
+vis_3d = True
 
-calib_path = "/data1/dongying/Mono3d/G1M3_FDL2232/20250912/calib/L2_calib/camera4.json"
-calib_path = "/data1/dongying/Mono3d/D4Q_51/20250712/calib/L2_calib/camera4.json"
-intrinsic, extrinsic, distortion = read_calibs(calib_path)
+# img_list = [
+#     "/mnt/mono3d/swji_data/Mono3d_4face_8m_d4q_bt601full/driving/D4Q_51/20250415/images/D4Q_51_20250415_seq_87_camera4_001640_113030.jpg"
+# ]
 
-mode = 'yuv444'
-if mode == 'bgr':
-    img_2d = img.copy()
-elif mode == 'yuv444':
-    img_2d = yuv444_bt601_full_range2rgb(img.copy(), w_img, h_img)[..., ::-1].copy()
-img_3d_base = img_2d.copy()
-img_3d_face = img_2d.copy()
+# test_dir = "/mnt/mono3d/swji_data/Mono3d_4face_8m_d4q_bt601full/driving/D4Q_51/20250411/images"
+# img_name_list = os.listdir(test_dir)
+# img_list = [os.path.join(test_dir, img_name) for img_name in img_name_list if img_name.endswith('.jpg')]
+# img_list.sort()
 
-class_names = ["car",  "tinycar", "bus", "van", "truck","tanker", "large_truck", "construction_vehicle","special_vehicle", "unknown", # 0-9
-            'pedestrian', 'bicycle', "bicyclist", # 10-12
-            "motorcycle", "motorcyclist", "tricycle", "tricyclist", # 13-16
-            'traffic_light_bbox', 'traffic_light_bulb',
-            'traffic_sign', 'animal', 'movable_object',
-            'warning_triangle', 'traffic_cone', 'water_barrier', 'crash_barrel',
-            'movable_barrier', 'bollard', 'sphere_bollard', 'cube_bollard',
-            'cylinder_bollard', 'construction_barrier', 'other_barrier',
-            'road_barrier_unknown', "wheel", "plate", "face"
-        ]
-# list to dict
-class_names = {i: class_names[i] for i in range(len(class_names))}
+# random.shuffle(img_list)
 
-# Process results list
-for result in results:
-    boxes = result.boxes  # Boxes object for bounding box outputs
-    
-    base3d = result.base_decoded
-    faces3d = result.faces_decoded
+for img_path in img_list[:5]:
 
-    xywh = boxes.xywh.detach().cpu().numpy()  # xywh numpy array
-    xyxy = boxes.xyxy.detach().cpu().numpy()  # xyxy numpy array
-    cls = boxes.cls.detach().cpu().numpy().astype(int)  # class indices numpy array
-    for i in range(len(boxes)):
+    # img_path = "/mnt/mono3d/xdzhu_data/Mono3d/Mono3d_4face_2m_g1m3/driving/G1M3_FDL2232/20250912/images/G1M3_FDL2232_20250912_seq_53_camera4_002777_68656.jpg"
+    # img_path = "/mnt/mono3d/swji_data/mono3d_test/mono3d/driving/D4Q_51/20250712/images/D4Q_51_20250712_seq_95_camera4_000632_80721.jpg"
 
-        if cls[i] > 16:
-            continue
+    img_name = os.path.basename(img_path).split('.')[0]
 
-        x, y, w, h = np.round(xywh[i]).astype(int)
-        x1,y1,x2,y2 = np.round(xyxy[i]).astype(int)
+    # if img_name != "D4Q_51_20250712_seq_262_camera4_001348_139084":
+    #     continue
+
+    img = cv2.imread(img_path)
+    # img = cv2.resize(img, (960, 540))
+    h_img, w_img, _ = img.shape
+
+    ROI = [0, 160, 3840, 1696]  # x1,y1,x2,y2
+    if ROI is not None:
+        h_roi, w_roi = ROI[3] - ROI[1], ROI[2] - ROI[0]
+    else:
+        ROI = [0, 0, w_img, h_img]
+        h_roi, w_roi = img.shape[:2]
+
+    h_input, w_input = 384, 960
+
+    results = model.predict(source=img, save=True, save_txt=True)  # return a list of Results objects
+
+    calib_path = "/data1/dongying/Mono3d/G1M3_FDL2232/20250912/calib/L2_calib/camera4.json"
+
+    date_name = img_path.split('/')[-3]
+    calib_path = f"/data1/dongying/Mono3d/D4Q_51/{date_name}/calib/L2_calib/camera4.json"
+    intrinsic, extrinsic, distortion = read_calibs(calib_path)
+
+    mode = 'yuv444'
+    if mode == 'bgr':
+        img_2d = img.copy()
+    elif mode == 'yuv444':
+        img_2d = yuv444_bt601_full_range2rgb(img.copy(), w_img, h_img)[..., ::-1].copy()
+    img_3d_base = img_2d.copy()
+    img_3d_face = img_2d.copy()
+
+    class_names = ["car",  "tinycar", "bus", "van", "truck","tanker", "large_truck", "construction_vehicle","special_vehicle", "unknown", # 0-9
+                'pedestrian', 'bicycle', "bicyclist", # 10-12
+                "motorcycle", "motorcyclist", "tricycle", "tricyclist", # 13-16
+                'traffic_light_bbox', 'traffic_light_bulb',
+                'traffic_sign', 'animal', 'movable_object',
+                'warning_triangle', 'traffic_cone', 'water_barrier', 'crash_barrel',
+                'movable_barrier', 'bollard', 'sphere_bollard', 'cube_bollard',
+                'cylinder_bollard', 'construction_barrier', 'other_barrier',
+                'road_barrier_unknown', "wheel", "plate", "face"
+            ]
+    # list to dict
+    class_names = {i: class_names[i] for i in range(len(class_names))}
+
+    # Process results list
+    for result in results:
+        boxes = result.boxes  # Boxes object for bounding box outputs
         
-        proj_px = int(round(base3d['proj_offset_cell'][i][0] * w_roi))
-        proj_pt = (proj_px+ROI[0], y)
+        base3d = result.base_decoded
+        faces3d = result.faces_decoded
 
-        cv2.rectangle(img_2d, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(img_2d, 'cls:'+str(cls[i]), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (36,255,12), 2)
-        # cv2.circle(img, proj_pt, 5, (0, 0, 255), 2)
+        xywh = boxes.xywh.detach().cpu().numpy()  # xywh numpy array
+        xyxy = boxes.xyxy.detach().cpu().numpy()  # xyxy numpy array
+        cls = boxes.cls.detach().cpu().numpy().astype(int)  # class indices numpy array
+        for i in range(len(boxes)):
+            
+            x, y, w, h = np.round(xywh[i]).astype(int)
+            x1,y1,x2,y2 = np.round(xyxy[i]).astype(int)
+            
+            # proj_px = int(round(base3d['proj_offset_cell'][i][0] * w_roi))
+            # proj_pt = (proj_px+ROI[0], y)
 
-        pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * base3d['z3d'][i]
-        pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
-
-        l3d, h3d, w3d = base3d['l3d'][i], base3d['h3d'][i], base3d['w3d'][i]
-        rot_y = base3d['rot_y'][i]
-
-        pred3d_cam = np.array([pt_cam[0][0], pt_cam[1][0], base3d['z3d'][i],
-                            l3d, h3d, w3d,
-                            rot_y])
-        
-        corners = cam_corners_front_rear(pred3d_cam, 'whole')
-
-        pred2d_corners = []
-        for idx_pt in range(len(corners)):
-            pt_img = cam_img_kb(corners[idx_pt,0], corners[idx_pt,1], corners[idx_pt,2], intrinsic, distortion)
-            pred2d_corners.append((pt_img[0], pt_img[1]))
-
-        sqe = [6,7,4,5,2,3,0,1]
-        pred2d_corners = np.array(pred2d_corners)[sqe]
-        img_3d_base = drawPointBox(img_3d_base, w_img, h_img, np.array(pred2d_corners), colors=[(0, 0, 255),(0, 255, 0)], thickness=1)
-
-        cutcls = np.argmax(base3d['cutcls_prob'][i])
-        
-        # decode face
-        face_scores = faces3d['score_prob'][i]
-        face_idx = np.argmax(face_scores)
-
-        if cutcls == 1:
-            face_idx = 0  # front face
-        elif cutcls == 2:
-            face_idx = 1  # tail face
-
-        if face_scores[face_idx] > 0.2:
-
-            proj_px = int(round(faces3d['proj_offset_cell'][i][face_idx][0] * w_roi))
+            proj_px = int(round(base3d['proj_px'][i][0] * w_roi/w_input))
             proj_pt = (proj_px+ROI[0], y)
 
-            pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * faces3d['z3d'][i][face_idx]
-            pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
+            if vis_2d:
+                cv2.rectangle(img_2d, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(img_2d, 'cls:'+str(cls[i]), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (36,255,12), 2)
+                # cv2.circle(img, proj_pt, 5, (0, 0, 255), 2)
 
-            size = faces3d['size'][i][face_idx]
+            if cls[i] <= 16:
+                # pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * base3d['z3d'][i]
+                # pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
 
-            if face_idx == 0:
-                facetype = 'front'
-                l, h, w = l3d, size[0], size[1]
-            elif face_idx == 1:
-                facetype = 'tail'
-                l, h, w = l3d, size[0], size[1]
-            elif face_idx == 2:
-                facetype = 'left'
-                l, h, w = size[0], size[1], w3d
-            elif face_idx == 3:
-                facetype = 'right'
-                l, h, w = size[0], size[1], w3d
+                x3d_new ,y3d_new = img_cam_kb(np.array([proj_pt[0],proj_pt[1]]).reshape((-1, 2)),intrinsic, distortion)
+                infer_x3d = x3d_new * base3d['z3d'][i]
+                infer_y3d = y3d_new * base3d['z3d'][i]
 
-            pred3d_cam_face = np.array([pt_cam[0][0], pt_cam[1][0], faces3d['z3d'][i][face_idx],
-                                        l, h, w,
-                                        rot_y])
-        else:
-            facetype = 'whole'
-            pred3d_cam_face = pred3d_cam
+                l3d, h3d, w3d = base3d['l3d'][i], base3d['h3d'][i], base3d['w3d'][i]
+                rot_y = base3d['rot_y'][i]
+                rot_y_cls = base3d['rot_y_cls'][i]
+                rot_y_res = base3d['rot_y_res'][i]
 
-        corners_face = cam_corners_front_rear(pred3d_cam_face, facetype)
+                pred3d_cam = np.array([infer_x3d, infer_y3d, base3d['z3d'][i],
+                                    l3d, h3d, w3d,
+                                    rot_y])
+                
+                corners = cam_corners_front_rear(pred3d_cam, 'whole')
 
-        pred2d_corners = []
-        for idx_pt in range(len(corners_face)):
-            pt_img = cam_img_kb(corners_face[idx_pt,0], corners_face[idx_pt,1], corners_face[idx_pt,2], intrinsic, distortion)
-            pred2d_corners.append((pt_img[0], pt_img[1]))
+                pred2d_corners = []
+                for idx_pt in range(len(corners)):
+                    pt_img = cam_img_kb(corners[idx_pt,0], corners[idx_pt,1], corners[idx_pt,2], intrinsic, distortion)
+                    pred2d_corners.append((pt_img[0], pt_img[1]))
 
-        sqe = [6,7,4,5,2,3,0,1]
-        pred2d_corners = np.array(pred2d_corners)[sqe]
-        img_3d_face = drawPointBox(img_3d_face, w_img, h_img, np.array(pred2d_corners), colors=[(0, 0, 255),(0, 255, 0)], thickness=1)
-    
-    cv2.imwrite(f"result_{model_version}_vis_2dbox.jpg", img_2d)
-    cv2.imwrite(f"result_{model_version}_vis_3dbox_base.jpg", img_3d_base)
-    cv2.imwrite(f"result_{model_version}_vis_3dbox_face.jpg", img_3d_face)
-    
-    # result.show()  # display to screen
-    # result.save(filename="result_train10.jpg")  # save to disk
+                sqe = [6,7,4,5,2,3,0,1]
+                pred2d_corners = np.array(pred2d_corners)[sqe]
+                img_3d_base = drawPointBox(img_3d_base, w_img, h_img, np.array(pred2d_corners), colors=[(0, 0, 255),(0, 255, 0)], thickness=1)
+
+                cutcls = np.argmax(base3d['cutcls_prob'][i])
+                
+                # decode face
+                face_scores = faces3d['score_prob'][i]
+                face_idx = np.argmax(face_scores)
+
+                print(f"face_scores: {face_scores}, face_idx: {face_idx}, cutcls_prob: {base3d['cutcls_prob'][i]}, cutcls: {cutcls}, 2d box: ({x1},{y1},{x2},{y2})")
+
+                # if cls[i] == 3:  # van
+                #     face_idx = 0
+
+                if cutcls == 1:
+                    face_idx = 0  # front face
+                elif cutcls == 2:
+                    face_idx = 1  # tail face
+
+                if face_scores[face_idx] > 0.2:
+
+                    # proj_px = int(round(faces3d['proj_offset_cell'][i][face_idx][0] * w_roi))
+                    # proj_pt = (proj_px+ROI[0], y)
+
+                    proj_px = int(round(faces3d['proj_px'][i][face_idx][0] * w_roi/w_input))
+                    proj_pt = (proj_px+ROI[0], y)
+
+                    x3d_new ,y3d_new = img_cam_kb(np.array([proj_pt[0],proj_pt[1]]).reshape((-1, 2)),intrinsic, distortion)
+                    infer_x3d = x3d_new * faces3d['z3d'][i][face_idx]
+                    infer_y3d = y3d_new * faces3d['z3d'][i][face_idx]
+
+                    # pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * faces3d['z3d'][i][face_idx]
+                    # pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
+
+                    size = faces3d['size'][i][face_idx]
+
+                    if face_idx == 0:
+                        facetype = 'front'
+                        l, h, w = l3d, size[0], size[1]
+                    elif face_idx == 1:
+                        facetype = 'tail'
+                        l, h, w = l3d, size[0], size[1]
+                    elif face_idx == 2:
+                        facetype = 'left'
+                        l, h, w = size[0], size[1], w3d
+                    elif face_idx == 3:
+                        facetype = 'right'
+                        l, h, w = size[0], size[1], w3d
+
+                    pred3d_cam_face = np.array([infer_x3d, infer_y3d, faces3d['z3d'][i][face_idx],
+                                                l, h, w,
+                                                rot_y])
+                else:
+                    facetype = 'whole'
+                    pred3d_cam_face = pred3d_cam
+
+                corners_face = cam_corners_front_rear(pred3d_cam_face, facetype)
+
+                pred2d_corners = []
+                for idx_pt in range(len(corners_face)):
+                    pt_img = cam_img_kb(corners_face[idx_pt,0], corners_face[idx_pt,1], corners_face[idx_pt,2], intrinsic, distortion)
+                    pred2d_corners.append((pt_img[0], pt_img[1]))
+
+                sqe = [6,7,4,5,2,3,0,1]
+                pred2d_corners = np.array(pred2d_corners)[sqe]
+                img_3d_face = drawPointBox(img_3d_face, w_img, h_img, np.array(pred2d_corners), colors=[(0, 0, 255),(0, 255, 0)], thickness=1)
+                cv2.circle(img_3d_face, proj_pt, 5, (0, 255, 255), 4)
+        
+        cv2.imwrite(os.path.join(output_dir, f"{img_name}_vis_2dbox.jpg"), img_2d)
+        cv2.imwrite(os.path.join(output_dir, f"{img_name}_vis_3dbox_base.jpg"), img_3d_base)
+        cv2.imwrite(os.path.join(output_dir, f"{img_name}_vis_3dbox_face.jpg"), img_3d_face)
+        
+        # result.show()  # display to screen
+        # result.save(filename="result_train10.jpg")  # save to disk

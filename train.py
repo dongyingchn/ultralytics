@@ -10,7 +10,7 @@ SETTINGS["tensorboard"] = True
 
 # model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11n.pt")  # load a pretrained model
 model = YOLO("yolo11s-minieye-2d.yaml")  # build a new model from scratch
-# model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect/train12/weights/best.pt")  # build a new model from scratch
+# model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/minieye-driving-d4q-roi-multi_res-combined-proj_loss-face_vis/weights/last.pt")  # build a new model from scratch
 
 measure_with_thop(model, input_size=(384,960), device='cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -120,9 +120,10 @@ def load_partial_weights(model, ckpt_path=None, migrate_head_conv=False):
 
 results = model.train(data="minieye-driving-D4Q.yaml", epochs=100, imgsz=960, 
                       batch=512, device=[0,1,2,3,4,5,6,7], 
-                    #   batch=16, device=[0,1], 
+                    #   batch=8, device=[0,1], 
                       workers=6,
                       optimizer='AdamW', lr0=0.001, rect=True,
                       project='runs/detect_d4q',
-                      name='minieye-driving-d4q-roi',
-                      train_3d=True,)  # train the model
+                      name='minieye-driving-d4q-roi-multi_res-combined-proj_loss-face_vis',
+                      train_3d=True,
+                      resume=False,)  # train the model

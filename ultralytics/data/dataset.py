@@ -74,7 +74,7 @@ class YOLODataset(BaseDataset):
         >>> dataset.get_labels()
     """
 
-    def __init__(self, *args, data: dict | None = None, task: str = "detect", **kwargs):
+    def __init__(self, *args, data: dict | None = None, task: str = "detect", roi=None, roi_policy=None, output_shape=None, **kwargs):
         """
         Initialize the YOLODataset.
 
@@ -91,11 +91,11 @@ class YOLODataset(BaseDataset):
         assert not (self.use_segments and self.use_keypoints), "Can not use both segments and keypoints."
 
         # NEW: read roi from data dict (if provided) and forward it to BaseDataset
-        roi = None
-        if isinstance(self.data, dict):
-            roi = self.data.get("roi", None)  # expected form [x1, y1, x2, y2] or None
+        # roi = None
+        # if isinstance(self.data, dict):
+        #     roi = self.data.get("roi", None)  # expected form [x1, y1, x2, y2] or None
 
-        super().__init__(*args, channels=self.data.get("channels", 3), roi=roi, **kwargs)
+        super().__init__(*args, channels=self.data.get("channels", 3), roi=roi, roi_policy=roi_policy, output_shape=output_shape, **kwargs)
 
     def cache_labels(self, path: Path = Path("./labels.cache")) -> dict:
         """

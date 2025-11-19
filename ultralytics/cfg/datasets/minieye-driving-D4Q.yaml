@@ -15,7 +15,7 @@
 # test: # test images (optional)
 
 path: /deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/train_data/D4Q # dataset root dir
-train: train_20251114_195583.txt # train images (relative to 'path') 4 images
+train: train_20251116_combined.txt #train_20251114_195583.txt # train images (relative to 'path') 4 images
 val: val_20251114_21732.txt # val images (relative to 'path') 4 images
 test: # test images (optional)
 
@@ -65,3 +65,24 @@ names:
 enable_3d: True  # enable 3D labels
 
 roi: [0, 160, 3840, 1696]  # region of interest [x_min, y_min, x_max, y_max]
+
+# 新字段：统一裁剪后 resize 的输出尺寸 (W, H)，用于保证进入模型前尺寸一致
+output_shape: [960, 384]
+
+# 新字段：ROI 策略（可选）
+# 支持三种类型：
+# - static: 固定 ROI（与上面的 roi 等价，但更明确）
+# - random_window: 随机窗口裁剪，支持分辨率规则表 + 兜底长宽比
+# - mixed: 混合策略（如 4K 用固定 ROI，其它分辨率按随机窗口）
+roi_policy:
+  type: mixed
+  static:  # 指定某些原图分辨率用固定 ROI
+    "3840x2160": [0, 160, 3840, 1696]
+  random:   # 其它分辨率使用的随机窗口策略
+    type: random_window
+    aspect_ratio: 2.5          # 兜底长宽比（W/H）
+    seed: 42                   # 可复现实验
+    prefer_full_width: false   # 优先用全宽，否则按比例自适应
+    rules:                     # 某些分辨率的明确裁剪窗口尺寸 (cropW, cropH)
+      "1280x720": [960, 384]
+      "1920x1080": [1920, 768]

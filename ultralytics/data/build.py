@@ -26,9 +26,15 @@ from ultralytics.data.loaders import (
     autocast_list,
 )
 from ultralytics.data.utils import IMG_FORMATS, VID_FORMATS
-from ultralytics.utils import RANK, colorstr
+from ultralytics.utils import RANK, colorstr, LOGGER
 from ultralytics.utils.checks import check_file
 from ultralytics.utils.torch_utils import TORCH_2_0
+
+# NEW: ROI policies factory (build from YAML config if provided here)
+try:
+    from ultralytics.data.roi_policies import build_roi_policy_from_config
+except Exception:
+    build_roi_policy_from_config = None  # optional import; will warn if used without module
 
 
 class InfiniteDataLoader(dataloader.DataLoader):
@@ -130,6 +136,33 @@ def build_yolo_dataset(
 ):
     """Build and return a YOLO dataset based on configuration parameters."""
     dataset = YOLOMultiModalDataset if multi_modal else YOLODataset
+
+    # --- NEW: parse ROI-related configs from data (YAML) ---
+    roi = data.get("roi", None)  # global fixed ROI [x1,y1,x2,y2]
+    output_shape = data.get("output_shape", None)
+    if isinstance(output_shape, (list, tuple)) and len(output_shape) == 2:
+        output_shape = (int(output_shape[0]), int(output_shape[1]))
+    elif output_shape is not None:
+        LOGGER.warning(f"{colorstr('yellow','bold')}Invalid output_shape in data YAML: {output_shape}, expect [W,H]. Ignoring.")
+        output_shape = None
+
+    # If an object already built upstream (e.g., in BaseTrainer.get_dataset), reuse it
+    roi_policy_obj = data.get("roi_policy_obj", None)
+
+    # Else, if YAML provided a raw roi_policy dict and factory available, build it here
+    if roi_policy_obj is None and isinstance(data.get("roi_policy", None), dict):
+        if build_roi_policy_from_config is None:
+            LOGGER.warning(
+                f"{colorstr('yellow','bold')}roi_policy config found but roi_policies module missing. "
+                f"Install/add ultralytics.data.roi_policies to enable policy building here."
+            )
+        else:
+            try:
+                roi_policy_obj = build_roi_policy_from_config(data["roi_policy"])
+            except Exception as e:
+                LOGGER.warning(f"{colorstr('yellow','bold')}Failed to build roi_policy from YAML: {e}. Using 'roi' if provided.")
+                roi_policy_obj = None
+
     return dataset(
         img_path=img_path,
         imgsz=cfg.imgsz,
@@ -146,6 +179,11 @@ def build_yolo_dataset(
         classes=cfg.classes,
         data=data,
         fraction=cfg.fraction if mode == "train" else 1.0,
+
+        # NEW: pass-through ROI params (YOLODataset/BaseDataset should accept these)
+        roi=roi,
+        roi_policy=roi_policy_obj,
+        output_shape=output_shape,
     )
 
 
