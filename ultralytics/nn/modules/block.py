@@ -74,12 +74,14 @@ class DFL(nn.Module):
         x = torch.arange(c1, dtype=torch.float)
         self.conv.weight.data[:] = nn.Parameter(x.view(1, c1, 1, 1))
         self.c1 = c1
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply the DFL module to input tensor and return transformed output."""
         b, _, a = x.shape  # batch, channels, anchors
-        return self.conv(x.view(b, 4, self.c1, a).transpose(2, 1).softmax(1)).view(b, 4, a)
+        # return self.conv(x.view(b, 4, self.c1, a).transpose(2, 1).softmax(1)).view(b, 4, a) # original
         # return self.conv(x.view(b, self.c1, 4, a).softmax(1)).view(b, 4, a)
+        return self.conv(self.softmax(x.view(b, 4, self.c1, a).transpose(2, 1))).view(b, 4, a) # new
 
 
 class Proto(nn.Module):
@@ -233,6 +235,9 @@ class SPPF(nn.Module):
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_ * 4, c2, 1, 1)
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
+
+        # import copy
+        # self.m_list = [copy.deepcopy(self.m) for i in range(3)]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply sequential pooling operations to input and return concatenated feature maps."""
@@ -1337,6 +1342,8 @@ class Attention(nn.Module):
         self.proj = Conv(dim, dim, 1, act=False)
         self.pe = Conv(dim, dim, 3, 1, g=dim, act=False)
 
+        self.softmax = nn.Softmax(dim=1)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the Attention module.
@@ -1355,7 +1362,14 @@ class Attention(nn.Module):
         )
 
         attn = (q.transpose(-2, -1) @ k) * self.scale
-        attn = attn.softmax(dim=-1)
+        # attn = attn.softmax(dim=-1)
+
+        attn_trans = attn.transpose(1, -1)
+        attn_trans = self.softmax(attn_trans)
+        attn = attn_trans.transpose(1, -1)
+
+        # attn = attn.transpose(1, -1).softmax(dim=1).transpose(1, -1)
+
         x = (v @ attn.transpose(-2, -1)).view(B, C, H, W) + self.pe(v.reshape(B, C, H, W))
         x = self.proj(x)
         return x

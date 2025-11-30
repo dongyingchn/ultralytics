@@ -95,7 +95,8 @@ class BaseDataset(Dataset):
         channels: int = 3,
         roi: tuple[int, int, int, int] | None = None,  # NEW: global roi (x1,y1,x2,y2) or None
         roi_policy: Any | None = None, 
-        output_shape: tuple[int,int] | None = None
+        output_shape: tuple[int,int] | None = None,
+        roi_name: str | None = None  # <<<< 新增 roi_name 参数
     ):
         """
         Initialize BaseDataset with given configuration and options.
@@ -129,6 +130,7 @@ class BaseDataset(Dataset):
         self.roi = roi  # store global ROI
         self.roi_policy = roi_policy
         self.output_shape = output_shape
+        self.roi_name = roi_name if roi_name else "default" # <<<< 新增：存储 roi_name
 
         self.im_files = self.get_img_files(self.img_path)
         self.labels = self.get_labels()
@@ -1083,6 +1085,9 @@ class BaseDataset(Dataset):
 
         # Adapt label coordinates to crop (and filter out instances fully outside crop)
         label = self._adapt_label_for_roi(label, roi, hw_full, hw_crop)
+
+        # <<<< 新增：在此处注入 roi_name >>>>
+        label["roi_name"] = self.roi_name
 
         return self.update_labels_info(label)
 

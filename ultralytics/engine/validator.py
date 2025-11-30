@@ -38,6 +38,63 @@ from ultralytics.utils.checks import check_imgsz
 from ultralytics.utils.ops import Profile
 from ultralytics.utils.torch_utils import attempt_compile, select_device, smart_inference_mode, unwrap_model
 
+# Import necessary functions for the new inference logic
+from ultralytics.utils.tal import dist2bbox, make_anchors
+from ultralytics.nn.modules.head import Detect3D
+
+
+def _decode_bboxes(
+    head, bboxes: torch.Tensor, anchors: torch.Tensor, xywh: bool = True
+) -> torch.Tensor:
+    """
+    Decodes bounding boxes from predictions, externalized from the Detect module.
+    This is a copy of Detect.decode_bboxes.
+    """
+    return dist2bbox(
+        bboxes,
+        anchors,
+        xywh=xywh and not head.end2end and not head.xyxy,
+        dim=1,
+    )
+
+def inference_from_raw_output(head, x) -> torch.Tensor:
+    """
+    Performs inference from raw feature maps, replicating Detect._inference logic externally.
+
+    Args:
+        head (Detect): The detection head module instance.
+        x (list[torch.Tensor]): The list of raw feature maps from the model's forward pass.
+
+    Returns:
+        (torch.Tensor): A concatenated tensor of decoded bounding boxes and class probabilities.
+    """
+    shape = x[0].shape  # BCHW
+    x_cat = torch.cat([xi.view(shape[0], head.no, -1) for xi in x], 2)
+
+    # Reconstruct anchors and strides if dynamic shape or first run
+    if head.dynamic or head.shape != shape:
+        head.anchors, head.strides = (y.transpose(0, 1) for y in make_anchors(x, head.stride, 0.5))
+        head.shape = shape
+
+    # Split into box and class predictions
+    if head.export and head.format in {"saved_model", "pb", "tflite", "edgetpu", "tfjs"}:
+        box = x_cat[:, : head.reg_max * 4]
+        cls = x_cat[:, head.reg_max * 4 :]
+    else:
+        box, cls = x_cat.split((head.reg_max * 4, head.nc), 1)
+
+    # Decode bounding boxes
+    if head.export and head.format in {"tflite", "edgetpu"}:
+        # Special handling for TFLite stability
+        grid_h, grid_w = shape[2], shape[3]
+        grid_size = torch.tensor([grid_w, grid_h, grid_w, grid_h], device=box.device).reshape(1, 4, 1)
+        norm = head.strides / (head.stride[0] * grid_size)
+        dbox = _decode_bboxes(head, head.dfl(box) * norm, head.anchors.unsqueeze(0) * norm[:, :2])
+    else:
+        dbox = _decode_bboxes(head, head.dfl(box), head.anchors.unsqueeze(0)) * head.strides
+
+    # Concatenate decoded boxes with class scores
+    return torch.cat((dbox, cls.sigmoid()), 1)
 
 class BaseValidator:
     """
@@ -202,6 +259,22 @@ class BaseValidator:
         bar = TQDM(self.dataloader, desc=self.get_desc(), total=len(self.dataloader))
         self.init_metrics(unwrap_model(model))
         self.jdict = []  # empty before each val
+
+        # ---- START OF MODIFICATION AREA ----
+        # Get the detection head for QAT mode
+        unwrapped_model = unwrap_model(model)
+        try:
+            # Assuming the head is the last module in the model sequence
+            if hasattr(unwrapped_model.model, 'model'):
+                detect_head = unwrapped_model.model.model[-1]
+            else:
+                detect_head = None
+            if not isinstance(detect_head, Detect3D):
+                 detect_head = None # Not a detection model or structure is different
+        except (AttributeError, IndexError):
+            detect_head = None
+        # ---- END OF MODIFICATION AREA ----
+
         for batch_i, batch in enumerate(bar):
             self.run_callbacks("on_val_batch_start")
             self.batch_i = batch_i
@@ -220,6 +293,8 @@ class BaseValidator:
 
             # Postprocess
             with dt[3]:
+                if detect_head is not None and hasattr(detect_head, 'qat') and detect_head.qat == True:
+                    preds = inference_from_raw_output(detect_head, preds[0])
                 preds = self.postprocess(preds)
 
             self.update_metrics(preds, batch)

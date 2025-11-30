@@ -929,6 +929,7 @@ class v8Detection3DLoss:
         device = next(model.parameters()).device
         h = model.args
         m = model.model[-1]  # Detect()/Detect3D()
+        # m = model.model.detect
 
         # 2D 基础参数（同 v8DetectionLoss）
         self.bce = nn.BCEWithLogitsLoss(reduction="none")
@@ -1142,6 +1143,10 @@ class v8Detection3DLoss:
         imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]
         anchor_points, stride_tensor = make_anchors(feats, self.stride, 0.5)
 
+        # --- 新增：从 batch 中获取 ROI ID ---
+        # roi_ids_per_image 的形状为 [batch_size]，值为 0 (Wide), 1 (Tele) 等
+        roi_ids_per_image = batch.get("roi_id", torch.zeros(batch_size, device=self.device, dtype=torch.int8))
+
         # Targets 与匹配
         targets = torch.cat((batch["batch_idx"].view(-1, 1), batch["cls"].view(-1, 1), batch["bboxes"]), 1)
         targets = self.preprocess(targets, batch_size, scale_tensor=imgsz[[1, 0, 1, 0]])
@@ -1222,6 +1227,11 @@ class v8Detection3DLoss:
             # 正样本对应的 GT 索引（图内编号）
             gi = target_gt_idx[b_idx, a_idx]  # (P,)
 
+            # --- 新增：为每个正样本获取其 ROI ID ---
+            # 使用 b_idx (每个正样本所属的图片索引) 来索引 roi_ids_per_image
+            # target_roi_ids 的形状为 [P,]，值为 0 或 1
+            target_roi_ids = roi_ids_per_image[b_idx]
+
             # 正样本 3D 预测 (P, n3d)
             pred3d_pos = pred_extra3d[b_idx, a_idx]  # (P, n3d)
 
@@ -1243,13 +1253,30 @@ class v8Detection3DLoss:
             # ---- 基础3D：仅在 has3d 上监督（稳定均值化）
             m = has3d_pos
             if m.any():
+                depth_mask = gt_base_pos[:, 2] <= 50.0
+                lateral_mask = torch.abs(gt_base_pos[:, 0]) < 35.0
+                height_mask = torch.abs(gt_base_pos[:, 1]) < 10.0
+                m = m & depth_mask & lateral_mask & height_mask
+
                 m_sum = m.sum().clamp_min(1)
                 # xyz, lwh, proj 以元素均值统计；旋转使用角度损失
 
                 gt_base_pos_norm = torch.zeros_like(gt_base_pos)
                 gt_base_pos_norm[m, 0] = gt_base_pos[m, 0] / 35.0
                 gt_base_pos_norm[m, 1] = gt_base_pos[m, 1] / 5.0
-                gt_base_pos_norm[m, 2] = (gt_base_pos[m, 2] - 40) / 40
+
+                # --- 条件化 Z 坐标归一化 (Base 3D) ---
+                # 约定：ID 1 代表 'Tele_ROI'
+                tele_mask = (target_roi_ids == 1) & m
+                wide_mask = (target_roi_ids != 1) & m
+                # 应用长焦策略
+                gt_base_pos_norm[tele_mask, 2] = (gt_base_pos[tele_mask, 2] / 2.0 - 40.0) / 40.0
+                # 应用广角/默认策略
+                gt_base_pos_norm[wide_mask, 2] = (gt_base_pos[wide_mask, 2] - 40.0) / 40.0
+                # ---------------------------------------------
+
+                # gt_base_pos_norm[m, 2] = (gt_base_pos[m, 2] - 40) / 40
+
                 gt_base_pos_norm[m, 3:6] = gt_base_pos[m, 3:6] / 18.0
 
                 l_xyz = self.L1loss(pred_base[m, 0], gt_base_pos_norm[m, 2]) / m_sum
@@ -1282,6 +1309,11 @@ class v8Detection3DLoss:
             # ---- 车辆 4 面：仅在 vehicle 上；几何/投影只监督可见(is_vis)面并以 score 作为权重
             vm = vehicle_pos
             if vm.any():
+                depth_mask_vm = gt_base_pos[:, 2] < 50.0
+                lateral_mask_vm = torch.abs(gt_base_pos[:, 0]) < 35.0
+                height_mask_vm = torch.abs(gt_base_pos[:, 1]) < 10.0
+                vm = vm & depth_mask_vm & lateral_mask_vm & height_mask_vm
+
                 pv = vm.sum().item()
                 p_faces = pred_faces[vm]        # (Pv, 4, 7)
                 g_faces = gt_faces_pos[vm]      # (Pv, 4, 7)
@@ -1296,7 +1328,28 @@ class v8Detection3DLoss:
                 g_faces_norm = torch.zeros_like(g_faces)
                 g_faces_norm[:, :, 0] = g_faces[:, :, 0] / 35.0
                 g_faces_norm[:, :, 1] = g_faces[:, :, 1] / 5.0
-                g_faces_norm[:, :, 2] = (g_faces[:, :, 2] - 40) / 40
+                # g_faces_norm[:, :, 2] = (g_faces[:, :, 2] - 40) / 40
+
+                # --- 条件化 Z 坐标归一化 (Faces 3D) ---
+                # `vm` 已经是 vehicle_pos 的掩码，形状为 [P,]
+                # 我们需要将 target_roi_ids 扩展以匹配 g_faces 的形状
+                # target_roi_ids 的形状是 [P,], 我们需要 [Pv, 4]
+                # `g_faces` 的形状是 [Pv, 4, 7]，其中 Pv 是 vm.sum()
+                
+                # 获取 vehicle 正样本对应的 ROI ID
+                roi_ids_for_vehicles = target_roi_ids[vm] # 形状 [Pv,]
+
+                # 创建掩码
+                tele_mask_v = (roi_ids_for_vehicles == 1) # 形状 [Pv,]
+                wide_mask_v = (roi_ids_for_vehicles != 1) # 形状 [Pv,]
+
+                # g_faces 的形状是 [Pv, 4, 7]
+                # tele_mask_v[:, None] 的形状是 [Pv, 1]，可以广播到 [Pv, 4]
+                # 应用长焦策略
+                g_faces_norm[tele_mask_v, :, 2] = (g_faces[tele_mask_v, :, 2] / 2.0 - 40.0) / 40.0 
+                # 应用广角/默认策略
+                g_faces_norm[wide_mask_v, :, 2] = (g_faces[wide_mask_v, :, 2] - 40.0) / 40.0
+                # ---------------------------------------------
 
                 gt_base = gt_base_pos[vm]  # (Pv, 9)
                 gt_faces_with_size = torch.zeros((g_faces.shape[0], g_faces.shape[1], 9), device=g_faces.device, dtype=g_faces.dtype)

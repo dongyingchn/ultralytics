@@ -203,7 +203,9 @@ class BasePredictor:
                     per_roi = (self.data.get("roi") if isinstance(self.data, dict) else None)
                 per_roi = _normalize_and_clip_roi(per_roi, full_w, full_h)
 
-                per_roi = [0, 160, 3840, 1696] if per_roi is None else per_roi
+                # per_roi = [0, 160, 3840, 1696] if per_roi is None else per_roi
+                # per_roi = [960, 680, 2880, 1448]
+                # per_roi = [1440, 860, 2400, 1244]
 
                 # crop if ROI exists
                 if per_roi is not None:

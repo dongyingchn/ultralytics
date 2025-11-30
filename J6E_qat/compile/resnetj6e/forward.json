@@ -1,0 +1,1880 @@
+{
+    "summary": {
+        "BPU OPs per run (effective)": 34035840000,
+        "BPU core number": 1,
+        "BPU march": "b30g",
+        "DDR bytes per run": 98147456,
+        "DDR bytes per second": 18418404945,
+        "DDR megabytes per run": 93.600999999999999,
+        "DDR megabytes per second": 17565.200000000001,
+        "FPS": 187.66,
+        "HBDK version": "4.1.17",
+        "compiling options": "{\"march\": \"nash-e\", \"opt\": 2, \"jobs\": 32, \"max_time_per_fc\": 0.0, \"debug\": true, \"hbdk3_compatible_mode\": false, \"progress_bar\": false, \"advice\": 0.0, \"balance\": 100, \"input_no_padding\": false, \"output_no_padding\": false}",
+        "interval computing unit utilization": [
+            0.92700000000000005,
+            0.95499999999999996,
+            0.83099999999999996,
+            0.99099999999999999,
+            0.93600000000000005,
+            0.96099999999999997,
+            0.997,
+            0.998,
+            0.996,
+            0.98399999999999999,
+            0.98699999999999999,
+            0.98699999999999999,
+            0.97699999999999998,
+            0.99099999999999999,
+            0.89300000000000002,
+            0.92300000000000004,
+            0.88800000000000001,
+            0.76500000000000001,
+            0.76700000000000002,
+            0.81699999999999995,
+            0.84999999999999998,
+            0.71699999999999997,
+            0.56899999999999995,
+            0.85599999999999998,
+            0.98799999999999999,
+            0.92000000000000004,
+            0.56200000000000006
+        ],
+        "interval computing units utilization": [
+            0.92700000000000005,
+            0.95499999999999996,
+            0.83099999999999996,
+            0.99099999999999999,
+            0.93600000000000005,
+            0.96099999999999997,
+            0.997,
+            0.998,
+            0.996,
+            0.98399999999999999,
+            0.98699999999999999,
+            0.98699999999999999,
+            0.97699999999999998,
+            0.99099999999999999,
+            0.89300000000000002,
+            0.92300000000000004,
+            0.88800000000000001,
+            0.76500000000000001,
+            0.76700000000000002,
+            0.81699999999999995,
+            0.84999999999999998,
+            0.71699999999999997,
+            0.56899999999999995,
+            0.85599999999999998,
+            0.98799999999999999,
+            0.92000000000000004,
+            0.56200000000000006
+        ],
+        "interval loading bandwidth (megabytes/s)": [
+            3020,
+            1510,
+            5795,
+            21911,
+            20483,
+            11228,
+            14408,
+            7654,
+            924,
+            5659,
+            6515,
+            3124,
+            2901,
+            4693,
+            11138,
+            10755,
+            8204,
+            13700,
+            14470,
+            12008,
+            10610,
+            11864,
+            22993,
+            24910,
+            13550,
+            12019,
+            10740
+        ],
+        "interval number": 27,
+        "interval storing bandwidth (megabytes/s)": [
+            12304,
+            14854,
+            14941,
+            10357,
+            7910,
+            11701,
+            7910,
+            0,
+            2124,
+            4042,
+            3234,
+            2636,
+            1320,
+            937,
+            1406,
+            1875,
+            8200,
+            8928,
+            5497,
+            3940,
+            6306,
+            19168,
+            15251,
+            3194,
+            1381,
+            4335,
+            8115
+        ],
+        "interval time (ms)": 0.20000000000000001,
+        "latency (ms)": 5.3300000000000001,
+        "latency (ms) by segments": [
+            5.3289999999999997
+        ],
+        "latency (us)": 5328.8000000000002,
+        "layer details": [
+            [
+                "layer",
+                "ops",
+                "computing cost (no DDR)",
+                "load cost",
+                "store cost",
+                "active period of time"
+            ],
+            [
+                "_input_0_id_1",
+                0,
+                "0",
+                "16 us (0.2% of model)",
+                "0",
+                "0 ~ 17 us (17)"
+            ],
+            [
+                "_input_0_id_2",
+                0,
+                "26 us (0.4% of model)",
+                "<1 us",
+                "0",
+                "5 ~ 28 us (23)"
+            ],
+            [
+                "unamed_hbir.conv_id_10:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stem_conv.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                1300561920,
+                "539 us (10.1% of model)",
+                "24 us (0.4% of model)",
+                "0",
+                "17 ~ 5270 us (5253)"
+            ],
+            [
+                "unamed_hbir.conv_id_19:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "348 us (6.5% of model)",
+                "239 us (4.4% of model)",
+                "248 us (4.6% of model)",
+                "38 ~ 839 us (801)"
+            ],
+            [
+                "unamed_hbir.conv_id_28:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.1.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "171 us (3.2% of model)",
+                "2 us (0% of model)",
+                "0",
+                "560 ~ 878 us (318)"
+            ],
+            [
+                "unamed_hbir.conv_id_37:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.1.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "171 us (3.2% of model)",
+                "2 us (0% of model)",
+                "0",
+                "592 ~ 901 us (309)"
+            ],
+            [
+                "unamed_hbir.add_id_41:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage0.1._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "27 us (0.5% of model)",
+                "3 us (0% of model)",
+                "58 us (1.0% of model)",
+                "598 ~ 4077 us (3479)"
+            ],
+            [
+                "unamed_hbir.conv_id_48:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.2.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "162 us (3.0% of model)",
+                "36 us (0.6% of model)",
+                "33 us (0.6% of model)",
+                "629 ~ 1031 us (402)"
+            ],
+            [
+                "unamed_hbir.conv_id_57:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.2.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "171 us (3.2% of model)",
+                "2 us (0% of model)",
+                "0",
+                "970 ~ 1152 us (182)"
+            ],
+            [
+                "unamed_hbir.add_id_61:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage0.2._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "27 us (0.5% of model)",
+                "58 us (1.0% of model)",
+                "58 us (1.0% of model)",
+                "973 ~ 1160 us (187)"
+            ],
+            [
+                "unamed_hbir.conv_id_68:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.3.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "171 us (3.2% of model)",
+                "46 us (0.8% of model)",
+                "33 us (0.6% of model)",
+                "1046 ~ 1380 us (334)"
+            ],
+            [
+                "unamed_hbir.conv_id_77:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage0.3.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "171 us (3.2% of model)",
+                "2 us (0% of model)",
+                "0",
+                "1171 ~ 1406 us (235)"
+            ],
+            [
+                "unamed_hbir.add_id_81:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage0.3._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "27 us (0.5% of model)",
+                "58 us (1.0% of model)",
+                "0",
+                "1173 ~ 1409 us (236)"
+            ],
+            [
+                "unamed_hbir.conv_id_88:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.0.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                477757440,
+                "108 us (2.0% of model)",
+                "2 us (0% of model)",
+                "0",
+                "1200 ~ 1540 us (340)"
+            ],
+            [
+                "unamed_hbir.conv_id_97:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.0.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "110 us (2.0% of model)",
+                "3 us (0% of model)",
+                "0",
+                "1384 ~ 1590 us (206)"
+            ],
+            [
+                "unamed_hbir.conv_id_106:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.0.downconv.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                477757440,
+                "57 us (1.0% of model)",
+                "2 us (0% of model)",
+                "0",
+                "1425 ~ 1612 us (187)"
+            ],
+            [
+                "unamed_hbir.add_id_110:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage1.0._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 114, in forward\\n    out = out + self.downconv(identity)\\n\"  ",
+                0,
+                "13 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "1427 ~ 1615 us (188)"
+            ],
+            [
+                "unamed_hbir.conv_id_117:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.1.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "114 us (2.1% of model)",
+                "6 us (0.1% of model)",
+                "0",
+                "1613 ~ 1852 us (239)"
+            ],
+            [
+                "unamed_hbir.conv_id_126:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.1.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "120 us (2.2% of model)",
+                "3 us (0% of model)",
+                "0",
+                "1623 ~ 1875 us (252)"
+            ],
+            [
+                "unamed_hbir.add_id_130:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage1.1._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "17 us (0.3% of model)",
+                "<1 us",
+                "33 us (0.6% of model)",
+                "1626 ~ 1880 us (254)"
+            ],
+            [
+                "unamed_hbir.conv_id_137:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.2.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "120 us (2.2% of model)",
+                "3 us (0% of model)",
+                "0",
+                "1627 ~ 1900 us (273)"
+            ],
+            [
+                "unamed_hbir.conv_id_146:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.2.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "116 us (2.1% of model)",
+                "26 us (0.4% of model)",
+                "22 us (0.4% of model)",
+                "1705 ~ 2082 us (377)"
+            ],
+            [
+                "unamed_hbir.add_id_150:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage1.2._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "14 us (0.2% of model)",
+                "29 us (0.5% of model)",
+                "0",
+                "1907 ~ 2084 us (177)"
+            ],
+            [
+                "unamed_hbir.conv_id_157:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.3.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "112 us (2.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "1920 ~ 2140 us (220)"
+            ],
+            [
+                "unamed_hbir.conv_id_166:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage1.3.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                955514880,
+                "112 us (2.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "1935 ~ 2173 us (238)"
+            ],
+            [
+                "unamed_hbir.add_id_170:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage1.3._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "13 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "1939 ~ 2186 us (247)"
+            ],
+            [
+                "unamed_hbir.conv_id_177:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.0.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                318504960,
+                "55 us (1.0% of model)",
+                "4 us (0% of model)",
+                "28 us (0.5% of model)",
+                "2173 ~ 2242 us (69)"
+            ],
+            [
+                "unamed_hbir.conv_id_195:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.0.downconv.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                318504960,
+                "32 us (0.6% of model)",
+                "4 us (0% of model)",
+                "0",
+                "2177 ~ 2250 us (73)"
+            ],
+            [
+                "unamed_hbir.conv_id_186:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.0.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "50 us (0.9% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2182 ~ 2293 us (111)"
+            ],
+            [
+                "unamed_hbir.add_id_199:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.0._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 114, in forward\\n    out = out + self.downconv(identity)\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2187 ~ 2297 us (110)"
+            ],
+            [
+                "unamed_hbir.conv_id_206:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.1.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2188 ~ 2342 us (154)"
+            ],
+            [
+                "unamed_hbir.conv_id_215:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.1.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2298 ~ 2384 us (86)"
+            ],
+            [
+                "unamed_hbir.add_id_219:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.1._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2303 ~ 2389 us (86)"
+            ],
+            [
+                "unamed_hbir.conv_id_226:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.2.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2320 ~ 2433 us (113)"
+            ],
+            [
+                "unamed_hbir.conv_id_235:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.2.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2388 ~ 2476 us (88)"
+            ],
+            [
+                "unamed_hbir.add_id_239:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.2._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2393 ~ 2480 us (87)"
+            ],
+            [
+                "unamed_hbir.conv_id_246:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.3.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2394 ~ 2525 us (131)"
+            ],
+            [
+                "unamed_hbir.conv_id_255:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.3.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2479 ~ 2567 us (88)"
+            ],
+            [
+                "unamed_hbir.add_id_259:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.3._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2484 ~ 2572 us (88)"
+            ],
+            [
+                "unamed_hbir.conv_id_266:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.4.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2485 ~ 2616 us (131)"
+            ],
+            [
+                "unamed_hbir.conv_id_275:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.4.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2571 ~ 2659 us (88)"
+            ],
+            [
+                "unamed_hbir.add_id_279:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.4._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2576 ~ 2664 us (88)"
+            ],
+            [
+                "unamed_hbir.conv_id_286:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.5.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2577 ~ 2707 us (130)"
+            ],
+            [
+                "unamed_hbir.conv_id_295:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage2.5.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "2662 ~ 2750 us (88)"
+            ],
+            [
+                "unamed_hbir.add_id_299:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage2.5._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "0",
+                "2667 ~ 2754 us (87)"
+            ],
+            [
+                "unamed_hbir.conv_id_306:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.0.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                212336640,
+                "32 us (0.5% of model)",
+                "9 us (0.1% of model)",
+                "10 us (0.1% of model)",
+                "2669 ~ 2794 us (125)"
+            ],
+            [
+                "unamed_hbir.conv_id_324:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.0.downconv.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                212336640,
+                "24 us (0.4% of model)",
+                "9 us (0.1% of model)",
+                "0",
+                "2677 ~ 2806 us (129)"
+            ],
+            [
+                "unamed_hbir.conv_id_315:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.0.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "42 us (0.7% of model)",
+                "16 us (0.2% of model)",
+                "0",
+                "2764 ~ 2850 us (86)"
+            ],
+            [
+                "unamed_hbir.add_id_328:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage3.0._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 114, in forward\\n    out = out + self.downconv(identity)\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "7 us (0.1% of model)",
+                "5 us (0% of model)",
+                "2782 ~ 2881 us (99)"
+            ],
+            [
+                "unamed_hbir.conv_id_335:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.1.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "45 us (0.8% of model)",
+                "16 us (0.2% of model)",
+                "0",
+                "2859 ~ 2929 us (70)"
+            ],
+            [
+                "unamed_hbir.conv_id_344:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.1.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "45 us (0.8% of model)",
+                "31 us (0.5% of model)",
+                "0",
+                "2880 ~ 2968 us (88)"
+            ],
+            [
+                "unamed_hbir.add_id_348:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage3.1._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "<1 us",
+                "0",
+                "2911 ~ 2970 us (59)"
+            ],
+            [
+                "unamed_hbir.conv_id_355:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.2.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "45 us (0.8% of model)",
+                "16 us (0.2% of model)",
+                "0",
+                "2915 ~ 3028 us (113)"
+            ],
+            [
+                "unamed_hbir.conv_id_364:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.stage3.2.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "45 us (0.8% of model)",
+                "16 us (0.2% of model)",
+                "0",
+                "2963 ~ 3060 us (97)"
+            ],
+            [
+                "unamed_hbir.add_id_368:  \"OP\": \"torch.add\"  \"Mod\": \"model.stage3.2._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "<1 us",
+                "0",
+                "2979 ~ 3072 us (93)"
+            ],
+            [
+                "unamed_hbir.convtranspose_id_377:  \"OP\": \"torch.conv_transpose2d\"  \"Mod\": \"model.refinenet2.deconv_1\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 135, in forward\\n    x_deeper = self.deconv_1(x_deeper)\\n\"  ",
+                94371840,
+                "29 us (0.5% of model)",
+                "5 us (0% of model)",
+                "9 us (0.1% of model)",
+                "2980 ~ 3096 us (116)"
+            ],
+            [
+                "unamed_hbir.conv_id_386:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.refinenet2.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 59, in forward\\n    x = self.conv(x)\\n\"  ",
+                47185920,
+                "10 us (0.1% of model)",
+                "15 us (0.2% of model)",
+                "0",
+                "3065 ~ 3098 us (33)"
+            ],
+            [
+                "unamed_hbir.add_id_390:  \"OP\": \"torch.add\"  \"Mod\": \"model.refinenet2._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 141, in forward\\n    x = x_deeper + x_side\\n\"  ",
+                0,
+                "9 us (0.1% of model)",
+                "11 us (0.2% of model)",
+                "11 us (0.2% of model)",
+                "3071 ~ 3119 us (48)"
+            ],
+            [
+                "unamed_hbir.conv_id_397:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.refinenet2.conv_bn_3.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 59, in forward\\n    x = self.conv(x)\\n\"  ",
+                47185920,
+                "18 us (0.3% of model)",
+                "2 us (0% of model)",
+                "0",
+                "3108 ~ 3129 us (21)"
+            ],
+            [
+                "unamed_hbir.conv_id_406:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.refinenet2.res_4.conv_bn_1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "3118 ~ 3172 us (54)"
+            ],
+            [
+                "unamed_hbir.conv_id_415:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.refinenet2.res_4.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 89, in forward\\n    x = self.conv(x)\\n\"  ",
+                424673280,
+                "46 us (0.8% of model)",
+                "5 us (0% of model)",
+                "0",
+                "3124 ~ 3214 us (90)"
+            ],
+            [
+                "unamed_hbir.add_id_419:  \"OP\": \"torch.add\"  \"Mod\": \"model.refinenet2.res_4._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 116, in forward\\n    out = out + identity\\n\"  ",
+                0,
+                "7 us (0.1% of model)",
+                "<1 us",
+                "0",
+                "3129 ~ 3253 us (124)"
+            ],
+            [
+                "unamed_hbir.convtranspose_id_428:  \"OP\": \"torch.conv_transpose2d\"  \"Mod\": \"model.refinenet1.deconv_1\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 160, in forward\\n    x_deeper = self.deconv_1(x_deeper)\\n\"  ",
+                141557760,
+                "68 us (1.2% of model)",
+                "3 us (0% of model)",
+                "17 us (0.3% of model)",
+                "3130 ~ 3282 us (152)"
+            ],
+            [
+                "unamed_hbir.conv_id_437:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.refinenet1.conv_bn_2.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 59, in forward\\n    x = self.conv(x)\\n\"  ",
+                106168320,
+                "26 us (0.4% of model)",
+                "35 us (0.6% of model)",
+                "0",
+                "3217 ~ 3280 us (63)"
+            ],
+            [
+                "unamed_hbir.add_id_441:  \"OP\": \"torch.add\"  \"Mod\": \"model.refinenet1._generated_add_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/cfg/models_py/resnet_j6e.py', line 166, in forward\\n    x = x_deeper + x_side\\n\"  ",
+                0,
+                "19 us (0.3% of model)",
+                "29 us (0.5% of model)",
+                "29 us (0.5% of model)",
+                "3225 ~ 4116 us (891)"
+            ],
+            [
+                "unamed_hbir.conv_id_637:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_3d.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                424673280,
+                "43 us (0.8% of model)",
+                "18 us (0.3% of model)",
+                "0",
+                "3254 ~ 3323 us (69)"
+            ],
+            [
+                "unamed_hbir.conv_id_646:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_3d.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                424673280,
+                "50 us (0.9% of model)",
+                "5 us (0% of model)",
+                "0",
+                "3273 ~ 3367 us (94)"
+            ],
+            [
+                "unamed_hbir.conv_id_655:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_front_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 365, in forward\\n    featF = self.conv_front_feat(feat3d)\\n\"  ",
+                47185920,
+                "17 us (0.3% of model)",
+                "34 us (0.6% of model)",
+                "32 us (0.5% of model)",
+                "3292 ~ 3454 us (162)"
+            ],
+            [
+                "unamed_hbir.conv_id_664:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_tail_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 366, in forward\\n    featT = self.conv_tail_feat(feat3d)\\n\"  ",
+                47185920,
+                "10 us (0.1% of model)",
+                "29 us (0.5% of model)",
+                "20 us (0.3% of model)",
+                "3293 ~ 3495 us (202)"
+            ],
+            [
+                "unamed_hbir.conv_id_673:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_left_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 367, in forward\\n    featL = self.conv_left_feat(feat3d)\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "13 us (0.2% of model)",
+                "0",
+                "3396 ~ 3418 us (22)"
+            ],
+            [
+                "unamed_hbir.conv_id_724:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_left_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                1843200,
+                "10 us (0.1% of model)",
+                "1 us (0% of model)",
+                "6 us (0.1% of model)",
+                "3404 ~ 3431 us (27)"
+            ],
+            [
+                "unamed_hbir.conv_id_756:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_left_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                368640,
+                "3 us (0% of model)",
+                "10 us (0.1% of model)",
+                "1 us (0% of model)",
+                "3405 ~ 3497 us (92)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_521:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_front_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "2 us (0% of model)",
+                "5 us (0% of model)",
+                "3407 ~ 4972 us (1565)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_726:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_left_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "1 us (0% of model)",
+                "3407 ~ 3433 us (26)"
+            ],
+            [
+                "unamed_hbir.conv_id_708:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_front_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                1843200,
+                "11 us (0.2% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3429 ~ 3456 us (27)"
+            ],
+            [
+                "unamed_hbir.conv_id_740:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_front_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                368640,
+                "3 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3429 ~ 3480 us (51)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_710:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_front_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "3456 ~ 3480 us (24)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_742:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_front_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3457 ~ 3482 us (25)"
+            ],
+            [
+                "unamed_hbir.conv_id_716:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_tail_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                1843200,
+                "11 us (0.2% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3467 ~ 3501 us (34)"
+            ],
+            [
+                "unamed_hbir.conv_id_748:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_tail_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                368640,
+                "3 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3468 ~ 3502 us (34)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_718:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_tail_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "3470 ~ 3503 us (33)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_750:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_tail_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3470 ~ 3506 us (36)"
+            ],
+            [
+                "unamed_hbir.concat_id_819:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect.cv4.1._generated_cat_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 393, in forward\\n    out  = torch.cat([outF,\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "2 us (0% of model)",
+                "3 us (0% of model)",
+                "3470 ~ 3635 us (165)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_758:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_left_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "1 us (0% of model)",
+                "3475 ~ 3501 us (26)"
+            ],
+            [
+                "unamed_hbir.conv_id_682:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_right_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 368, in forward\\n    featR = self.conv_right_feat(feat3d)\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "16 us (0.3% of model)",
+                "0",
+                "3497 ~ 3538 us (41)"
+            ],
+            [
+                "unamed_hbir.conv_id_691:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_whole.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "8 us (0.1% of model)",
+                "0",
+                "3501 ~ 3524 us (23)"
+            ],
+            [
+                "unamed_hbir.conv_id_700:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_whole.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                2211840,
+                "10 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3509 ~ 3532 us (23)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_702:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_whole.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3511 ~ 3534 us (23)"
+            ],
+            [
+                "unamed_hbir.conv_id_732:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_right_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                1843200,
+                "9 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3524 ~ 3550 us (26)"
+            ],
+            [
+                "unamed_hbir.conv_id_764:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_right_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                368640,
+                "3 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3525 ~ 3552 us (27)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_734:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_right_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3527 ~ 3552 us (25)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_766:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_right_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3528 ~ 3553 us (25)"
+            ],
+            [
+                "unamed_hbir.conv_id_772:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_heading_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                94371840,
+                "17 us (0.3% of model)",
+                "2 us (0% of model)",
+                "0",
+                "3531 ~ 3561 us (30)"
+            ],
+            [
+                "unamed_hbir.conv_id_781:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_heading_feat.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                188743680,
+                "31 us (0.5% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3533 ~ 3587 us (54)"
+            ],
+            [
+                "unamed_hbir.conv_id_790:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_heading_feat.6\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                188743680,
+                "31 us (0.5% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3562 ~ 3610 us (48)"
+            ],
+            [
+                "unamed_hbir.conv_id_799:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_heading\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                5898240,
+                "18 us (0.3% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3565 ~ 3626 us (61)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_801:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_heading.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                0,
+                "<1 us",
+                "<1 us",
+                "0",
+                "3567 ~ 5092 us (1525)"
+            ],
+            [
+                "unamed_hbir.conv_id_807:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_cut_cls.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "2 us (0% of model)",
+                "0",
+                "3567 ~ 3619 us (52)"
+            ],
+            [
+                "unamed_hbir.conv_id_816:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.1.conv_cut_cls.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                1105920,
+                "9 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3588 ~ 3633 us (45)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_818:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.1.conv_cut_cls.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3589 ~ 3634 us (45)"
+            ],
+            [
+                "unamed_func.return_id_1244",
+                0,
+                "5 us (0% of model)",
+                "0",
+                "31 us (0.5% of model)",
+                "3635 ~ 5069 us (1434)"
+            ],
+            [
+                "unamed_hbir.conv_id_826:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_3d.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                424673280,
+                "41 us (0.7% of model)",
+                "30 us (0.5% of model)",
+                "9 us (0.1% of model)",
+                "3635 ~ 3719 us (84)"
+            ],
+            [
+                "unamed_hbir.conv_id_835:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_3d.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                424673280,
+                "45 us (0.8% of model)",
+                "16 us (0.2% of model)",
+                "0",
+                "3666 ~ 3751 us (85)"
+            ],
+            [
+                "unamed_hbir.conv_id_844:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_front_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 365, in forward\\n    featF = self.conv_front_feat(feat3d)\\n\"  ",
+                47185920,
+                "13 us (0.2% of model)",
+                "28 us (0.5% of model)",
+                "19 us (0.3% of model)",
+                "3684 ~ 3809 us (125)"
+            ],
+            [
+                "unamed_hbir.conv_id_853:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_tail_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 366, in forward\\n    featT = self.conv_tail_feat(feat3d)\\n\"  ",
+                47185920,
+                "7 us (0.1% of model)",
+                "10 us (0.1% of model)",
+                "11 us (0.2% of model)",
+                "3757 ~ 3826 us (69)"
+            ],
+            [
+                "unamed_hbir.conv_id_862:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_left_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 367, in forward\\n    featL = self.conv_left_feat(feat3d)\\n\"  ",
+                47185920,
+                "6 us (0.1% of model)",
+                "9 us (0.1% of model)",
+                "0",
+                "3767 ~ 3779 us (12)"
+            ],
+            [
+                "unamed_hbir.conv_id_913:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_left_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                921600,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "3 us (0% of model)",
+                "3776 ~ 3792 us (16)"
+            ],
+            [
+                "unamed_hbir.conv_id_945:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_left_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                184320,
+                "1 us (0% of model)",
+                "2 us (0% of model)",
+                "<1 us",
+                "3777 ~ 3833 us (56)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_915:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_left_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "2 us (0% of model)",
+                "1 us (0% of model)",
+                "3779 ~ 4031 us (252)"
+            ],
+            [
+                "unamed_hbir.conv_id_897:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_front_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                921600,
+                "6 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3792 ~ 3811 us (19)"
+            ],
+            [
+                "unamed_hbir.conv_id_929:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_front_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                184320,
+                "1 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3793 ~ 3811 us (18)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_899:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_front_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "14 us (0.2% of model)",
+                "0",
+                "3809 ~ 3832 us (23)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_931:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_front_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3810 ~ 3813 us (3)"
+            ],
+            [
+                "unamed_hbir.conv_id_905:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_tail_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                921600,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3823 ~ 3835 us (12)"
+            ],
+            [
+                "unamed_hbir.conv_id_937:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_tail_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                184320,
+                "1 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3824 ~ 3836 us (12)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_907:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_tail_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3826 ~ 3836 us (10)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_939:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_tail_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3827 ~ 3839 us (12)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_947:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_left_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "<1 us",
+                "3832 ~ 3835 us (3)"
+            ],
+            [
+                "unamed_hbir.conv_id_871:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_right_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 368, in forward\\n    featR = self.conv_right_feat(feat3d)\\n\"  ",
+                47185920,
+                "6 us (0.1% of model)",
+                "6 us (0.1% of model)",
+                "0",
+                "3832 ~ 3846 us (14)"
+            ],
+            [
+                "unamed_hbir.concat_id_1008:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect.cv4.2._generated_cat_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 393, in forward\\n    out  = torch.cat([outF,\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "0",
+                "1 us (0% of model)",
+                "3838 ~ 3920 us (82)"
+            ],
+            [
+                "unamed_hbir.conv_id_921:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_right_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                921600,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3839 ~ 3855 us (16)"
+            ],
+            [
+                "unamed_hbir.conv_id_953:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_right_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                184320,
+                "1 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3840 ~ 3856 us (16)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_923:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_right_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3842 ~ 3856 us (14)"
+            ],
+            [
+                "unamed_hbir.conv_id_880:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_whole.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                47185920,
+                "6 us (0.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3843 ~ 3859 us (16)"
+            ],
+            [
+                "unamed_hbir.conv_id_889:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_whole.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                1105920,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3846 ~ 3864 us (18)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_891:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_whole.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3848 ~ 3865 us (17)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_955:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_right_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3848 ~ 3865 us (17)"
+            ],
+            [
+                "unamed_hbir.conv_id_961:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_heading_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                47185920,
+                "6 us (0.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3850 ~ 3874 us (24)"
+            ],
+            [
+                "unamed_hbir.conv_id_970:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_heading_feat.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3867 ~ 3885 us (18)"
+            ],
+            [
+                "unamed_hbir.conv_id_979:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_heading_feat.6\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                47185920,
+                "9 us (0.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3871 ~ 3892 us (21)"
+            ],
+            [
+                "unamed_hbir.conv_id_988:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_heading\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                1474560,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3874 ~ 3897 us (23)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_990:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_heading.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3876 ~ 3898 us (22)"
+            ],
+            [
+                "unamed_hbir.conv_id_996:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_cut_cls.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                47185920,
+                "6 us (0.1% of model)",
+                "13 us (0.2% of model)",
+                "0",
+                "3876 ~ 3911 us (35)"
+            ],
+            [
+                "unamed_hbir.conv_id_1005:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.2.conv_cut_cls.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                552960,
+                "5 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3880 ~ 3918 us (38)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_1007:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.2.conv_cut_cls.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "3882 ~ 3920 us (38)"
+            ],
+            [
+                "unamed_hbir.conv_id_1093:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.1.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                212336640,
+                "20 us (0.3% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3903 ~ 3929 us (26)"
+            ],
+            [
+                "unamed_hbir.swish_id_1096:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"6\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "3911 ~ 3931 us (20)"
+            ],
+            [
+                "unamed_hbir.conv_id_1103:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.1.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                106168320,
+                "14 us (0.2% of model)",
+                "2 us (0% of model)",
+                "0",
+                "3912 ~ 3943 us (31)"
+            ],
+            [
+                "unamed_hbir.swish_id_1106:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"7\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "3914 ~ 3946 us (32)"
+            ],
+            [
+                "unamed_hbir.conv_id_1113:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.1.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                11796480,
+                "8 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3915 ~ 3952 us (37)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_1115:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv2.1.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "<1 us",
+                "0",
+                "3917 ~ 3956 us (39)"
+            ],
+            [
+                "unamed_hbir.conv_id_1121:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.1.0.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                3317760,
+                "13 us (0.2% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3918 ~ 3961 us (43)"
+            ],
+            [
+                "unamed_hbir.swish_id_1124:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"8\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "<1 us",
+                "0",
+                "3920 ~ 3965 us (45)"
+            ],
+            [
+                "unamed_hbir.conv_id_1131:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.1.0.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                35389440,
+                "13 us (0.2% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3921 ~ 3982 us (61)"
+            ],
+            [
+                "unamed_hbir.swish_id_1134:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"9\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "0",
+                "3946 ~ 3986 us (40)"
+            ],
+            [
+                "unamed_hbir.conv_id_1141:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.1.1.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                2488320,
+                "15 us (0.2% of model)",
+                "8 us (0.1% of model)",
+                "0",
+                "3946 ~ 3997 us (51)"
+            ],
+            [
+                "unamed_hbir.concat_id_1164:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect._generated_cat_1\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "0",
+                "0",
+                "3956 ~ 4026 us (70)"
+            ],
+            [
+                "unamed_hbir.swish_id_1144:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"10\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "0",
+                "3961 ~ 4001 us (40)"
+            ],
+            [
+                "unamed_hbir.conv_id_1151:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.1.1.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                26542080,
+                "12 us (0.2% of model)",
+                "1 us (0% of model)",
+                "0",
+                "3962 ~ 4012 us (50)"
+            ],
+            [
+                "unamed_hbir.swish_id_1154:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"11\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "0",
+                "3965 ~ 4016 us (51)"
+            ],
+            [
+                "unamed_hbir.conv_id_1161:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.1.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                10229760,
+                "10 us (0.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "3965 ~ 4025 us (60)"
+            ],
+            [
+                "unamed_hbir.conv_id_1171:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.2.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                106168320,
+                "10 us (0.1% of model)",
+                "4 us (0% of model)",
+                "0",
+                "3971 ~ 4020 us (49)"
+            ],
+            [
+                "unamed_hbir.swish_id_1174:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"12\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "4001 ~ 4022 us (21)"
+            ],
+            [
+                "unamed_hbir.conv_id_1181:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.2.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                26542080,
+                "4 us (0% of model)",
+                "5 us (0% of model)",
+                "0",
+                "4002 ~ 4034 us (32)"
+            ],
+            [
+                "unamed_hbir.swish_id_1184:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"13\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "4028 ~ 4035 us (7)"
+            ],
+            [
+                "unamed_hbir.conv_id_1191:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.2.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                2949120,
+                "3 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4029 ~ 4041 us (12)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_1193:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv2.2.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "4031 ~ 4043 us (12)"
+            ],
+            [
+                "unamed_hbir.conv_id_1199:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.2.0.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                1658880,
+                "7 us (0.1% of model)",
+                "4 us (0% of model)",
+                "0",
+                "4034 ~ 4047 us (13)"
+            ],
+            [
+                "unamed_hbir.swish_id_1202:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"14\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "4038 ~ 4049 us (11)"
+            ],
+            [
+                "unamed_hbir.conv_id_1209:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.2.0.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                17694720,
+                "7 us (0.1% of model)",
+                "2 us (0% of model)",
+                "0",
+                "4039 ~ 4056 us (17)"
+            ],
+            [
+                "unamed_hbir.swish_id_1212:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"15\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "4043 ~ 4062 us (19)"
+            ],
+            [
+                "unamed_hbir.conv_id_1219:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.2.1.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                622080,
+                "6 us (0.1% of model)",
+                "2 us (0% of model)",
+                "0",
+                "4048 ~ 4067 us (19)"
+            ],
+            [
+                "unamed_hbir.swish_id_1222:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"16\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "4058 ~ 4070 us (12)"
+            ],
+            [
+                "unamed_hbir.conv_id_1229:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.2.1.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                6635520,
+                "6 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4059 ~ 4073 us (14)"
+            ],
+            [
+                "unamed_hbir.swish_id_1232:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"17\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "1 us (0% of model)",
+                "<1 us",
+                "0",
+                "4061 ~ 4074 us (13)"
+            ],
+            [
+                "unamed_hbir.conv_id_1239:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.2.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                2557440,
+                "4 us (0% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4061 ~ 4076 us (15)"
+            ],
+            [
+                "unamed_hbir.concat_id_1242:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect._generated_cat_2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "0",
+                "0",
+                "4069 ~ 4077 us (8)"
+            ],
+            [
+                "unamed_hbir.conv_id_448:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_3d.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                955514880,
+                "112 us (2.1% of model)",
+                "3 us (0% of model)",
+                "62 us (1.1% of model)",
+                "4083 ~ 4187 us (104)"
+            ],
+            [
+                "unamed_hbir.conv_id_457:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_3d.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 364, in forward\\n    feat3d = self.conv_3d(x)                #4*256*40*100\\n\"  ",
+                955514880,
+                "112 us (2.1% of model)",
+                "61 us (1.1% of model)",
+                "0",
+                "4187 ~ 4314 us (127)"
+            ],
+            [
+                "unamed_hbir.conv_id_466:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_front_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 365, in forward\\n    featF = self.conv_front_feat(feat3d)\\n\"  ",
+                106168320,
+                "47 us (0.8% of model)",
+                "74 us (1.3% of model)",
+                "89 us (1.6% of model)",
+                "4211 ~ 4498 us (287)"
+            ],
+            [
+                "unamed_hbir.conv_id_475:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_tail_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 366, in forward\\n    featT = self.conv_tail_feat(feat3d)\\n\"  ",
+                106168320,
+                "25 us (0.4% of model)",
+                "89 us (1.6% of model)",
+                "56 us (1.0% of model)",
+                "4269 ~ 4599 us (330)"
+            ],
+            [
+                "unamed_hbir.conv_id_484:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_left_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 367, in forward\\n    featL = self.conv_left_feat(feat3d)\\n\"  ",
+                106168320,
+                "26 us (0.4% of model)",
+                "35 us (0.6% of model)",
+                "0",
+                "4355 ~ 4426 us (71)"
+            ],
+            [
+                "unamed_hbir.conv_id_535:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_left_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                5529600,
+                "29 us (0.5% of model)",
+                "1 us (0% of model)",
+                "17 us (0.3% of model)",
+                "4363 ~ 4434 us (71)"
+            ],
+            [
+                "unamed_hbir.conv_id_567:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_left_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                1105920,
+                "8 us (0.1% of model)",
+                "18 us (0.3% of model)",
+                "4 us (0% of model)",
+                "4364 ~ 4607 us (243)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_537:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_left_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 373, in forward\\n    outL = self.conv_left_face(featL)\\n\"  ",
+                0,
+                "5 us (0% of model)",
+                "<1 us",
+                "5 us (0% of model)",
+                "4366 ~ 4436 us (70)"
+            ],
+            [
+                "unamed_hbir.conv_id_519:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_front_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 371, in forward\\n    outF = self.conv_front_face(featF)      #4*5*40*100\\n\"  ",
+                5529600,
+                "29 us (0.5% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4431 ~ 4503 us (72)"
+            ],
+            [
+                "unamed_hbir.conv_id_551:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_front_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                1105920,
+                "9 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4432 ~ 4504 us (72)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_553:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_front_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 376, in forward\\n    scoreF = self.conv_front_score(featF)   #4*1*40*100\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "4496 ~ 4546 us (50)"
+            ],
+            [
+                "unamed_hbir.conv_id_527:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_tail_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                5529600,
+                "26 us (0.4% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4529 ~ 4609 us (80)"
+            ],
+            [
+                "unamed_hbir.conv_id_559:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_tail_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                1105920,
+                "7 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4530 ~ 4610 us (80)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_529:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_tail_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 372, in forward\\n    outT = self.conv_tail_face(featT)\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "0",
+                "4532 ~ 4610 us (78)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_561:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_tail_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 377, in forward\\n    scoreT = self.conv_tail_score(featT)\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "4532 ~ 4613 us (81)"
+            ],
+            [
+                "unamed_hbir.concat_id_630:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect.cv4.0._generated_cat_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 393, in forward\\n    out  = torch.cat([outF,\\n\"  ",
+                0,
+                "10 us (0.1% of model)",
+                "52 us (0.9% of model)",
+                "19 us (0.3% of model)",
+                "4533 ~ 5061 us (528)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_569:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_left_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 378, in forward\\n    scoreL = self.conv_left_score(featL)\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "1 us (0% of model)",
+                "4570 ~ 4608 us (38)"
+            ],
+            [
+                "unamed_hbir.conv_id_493:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_right_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 368, in forward\\n    featR = self.conv_right_feat(feat3d)\\n\"  ",
+                106168320,
+                "25 us (0.4% of model)",
+                "30 us (0.5% of model)",
+                "0",
+                "4605 ~ 4675 us (70)"
+            ],
+            [
+                "unamed_hbir.conv_id_543:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_right_face\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                5529600,
+                "26 us (0.4% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4617 ~ 4684 us (67)"
+            ],
+            [
+                "unamed_hbir.conv_id_575:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_right_score\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                1105920,
+                "7 us (0.1% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4618 ~ 4685 us (67)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_545:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_right_face.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 374, in forward\\n    outR = self.conv_right_face(featR)\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "3 us (0% of model)",
+                "4620 ~ 4687 us (67)"
+            ],
+            [
+                "unamed_hbir.conv_id_502:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_whole.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                106168320,
+                "25 us (0.4% of model)",
+                "30 us (0.5% of model)",
+                "0",
+                "4621 ~ 4690 us (69)"
+            ],
+            [
+                "unamed_hbir.conv_id_511:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_whole.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                6635520,
+                "26 us (0.4% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4632 ~ 4698 us (66)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_513:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_whole.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 369, in forward\\n    whole = self.conv_whole(feat3d)         #4*6*40*100\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "4 us (0% of model)",
+                "4633 ~ 4700 us (67)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_577:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_right_score.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 379, in forward\\n    scoreR = self.conv_right_score(featR)\\n\"  ",
+                0,
+                "3 us (0% of model)",
+                "<1 us",
+                "0",
+                "4636 ~ 4708 us (72)"
+            ],
+            [
+                "unamed_hbir.conv_id_583:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_heading_feat.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                283115520,
+                "64 us (1.2% of model)",
+                "33 us (0.6% of model)",
+                "0",
+                "4720 ~ 4886 us (166)"
+            ],
+            [
+                "unamed_hbir.conv_id_592:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_heading_feat.3\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                754974720,
+                "117 us (2.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "4730 ~ 4923 us (193)"
+            ],
+            [
+                "unamed_hbir.conv_id_601:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_heading_feat.6\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                754974720,
+                "117 us (2.1% of model)",
+                "3 us (0% of model)",
+                "0",
+                "4734 ~ 4947 us (213)"
+            ],
+            [
+                "unamed_hbir.conv_id_610:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_heading\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 390, in forward\\n    heading = self.conv_heading(self.conv_heading_feat(feat3d))      #4*8*40*100\\n\"  ",
+                23592960,
+                "66 us (1.2% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4737 ~ 4962 us (225)"
+            ],
+            [
+                "unamed_hbir.conv_id_618:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_cut_cls.0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                106168320,
+                "24 us (0.4% of model)",
+                "29 us (0.5% of model)",
+                "0",
+                "4840 ~ 5031 us (191)"
+            ],
+            [
+                "unamed_hbir.conv_id_627:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv4.0.conv_cut_cls.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                3317760,
+                "25 us (0.4% of model)",
+                "1 us (0% of model)",
+                "0",
+                "4970 ~ 5047 us (77)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_629:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv4.0.conv_cut_cls.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 391, in forward\\n    cut_cls = self.conv_cut_cls(feat3d)                              #4*3*40*100\\n\"  ",
+                0,
+                "2 us (0% of model)",
+                "<1 us",
+                "0",
+                "4972 ~ 5061 us (89)"
+            ],
+            [
+                "unamed_hbir.conv_id_1015:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.0.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                637009920,
+                "57 us (1.0% of model)",
+                "19 us (0.3% of model)",
+                "0",
+                "4977 ~ 5060 us (83)"
+            ],
+            [
+                "unamed_hbir.swish_id_1018:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "8 us (0.1% of model)",
+                "<1 us",
+                "0",
+                "4997 ~ 5073 us (76)"
+            ],
+            [
+                "unamed_hbir.conv_id_1025:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.0.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                424673280,
+                "53 us (0.9% of model)",
+                "36 us (0.6% of model)",
+                "10 us (0.1% of model)",
+                "5024 ~ 5193 us (169)"
+            ],
+            [
+                "unamed_hbir.swish_id_1028:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"1\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "8 us (0.1% of model)",
+                "<1 us",
+                "0",
+                "5089 ~ 5194 us (105)"
+            ],
+            [
+                "unamed_hbir.conv_id_1035:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv2.0.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                47185920,
+                "30 us (0.5% of model)",
+                "1 us (0% of model)",
+                "0",
+                "5089 ~ 5201 us (112)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_1037:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect.cv2.0.2.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "4 us (0% of model)",
+                "<1 us",
+                "0",
+                "5092 ~ 5211 us (119)"
+            ],
+            [
+                "unamed_hbir.conv_id_1043:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.0.0.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                9953280,
+                "36 us (0.6% of model)",
+                "17 us (0.3% of model)",
+                "0",
+                "5092 ~ 5204 us (112)"
+            ],
+            [
+                "unamed_hbir.swish_id_1046:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"2\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "12 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "5110 ~ 5212 us (102)"
+            ],
+            [
+                "unamed_hbir.conv_id_1053:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.0.0.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                106168320,
+                "44 us (0.8% of model)",
+                "1 us (0% of model)",
+                "0",
+                "5110 ~ 5215 us (105)"
+            ],
+            [
+                "unamed_hbir.swish_id_1056:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"3\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "12 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "5112 ~ 5216 us (104)"
+            ],
+            [
+                "unamed_hbir.concat_id_1086:  \"OP\": \"torch.cat\"  \"Mod\": \"model.detect._generated_cat_0\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "10 us (0.1% of model)",
+                "21 us (0.3% of model)",
+                "19 us (0.3% of model)",
+                "5133 ~ 5322 us (189)"
+            ],
+            [
+                "unamed_hbir.conv_id_1063:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.0.1.0.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                9953280,
+                "60 us (1.1% of model)",
+                "19 us (0.3% of model)",
+                "15 us (0.2% of model)",
+                "5157 ~ 5272 us (115)"
+            ],
+            [
+                "unamed_hbir.swish_id_1066:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"4\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "13 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "5229 ~ 5275 us (46)"
+            ],
+            [
+                "unamed_hbir.conv_id_1073:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.0.1.1.conv\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                106168320,
+                "47 us (0.8% of model)",
+                "1 us (0% of model)",
+                "0",
+                "5238 ~ 5313 us (75)"
+            ],
+            [
+                "unamed_hbir.swish_id_1076:  \"OP\": \"torch.nn.functional.silu\"  \"Mod\": \"model.detect.cv2.0.0.act\"  \"Id\": \"5\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/conv.py', line 81, in forward\\n    return self.act(self.bn(self.conv(x)))\\n\"  ",
+                0,
+                "13 us (0.2% of model)",
+                "<1 us",
+                "0",
+                "5268 ~ 5316 us (48)"
+            ],
+            [
+                "unamed_hbir.conv_id_1083:  \"OP\": \"torch.conv2d\"  \"Mod\": \"model.detect.cv3.0.2\"  \"Id\": \"0\"  \"Type\": \"call_function\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                40919040,
+                "33 us (0.6% of model)",
+                "1 us (0% of model)",
+                "0",
+                "5269 ~ 5320 us (51)"
+            ],
+            [
+                "unamed_qnt.const_fake_quant_id_1087:  \"OP\": \"horizon_plugin_pytorch.quantization.fake_quantize.FakeQuantize\"  \"Mod\": \"model.detect._generated_cat_0.activation_post_process\"  \"Id\": \"0\"  \"Type\": \"call_module\"  \"Code\": \"  File '/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/ultralytics/nn/modules/head.py', line 122, in forward\\n    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)\\n\"  ",
+                0,
+                "10 us (0.1% of model)",
+                "0",
+                "32 us (0.5% of model)",
+                "5292 ~ 5329 us (37)"
+            ]
+        ],
+        "loaded bytes per run": 60502400,
+        "multicore sync time (ms)": 0,
+        "run per second": 187.66,
+        "stored bytes per run": 37645056,
+        "worst FPS": 187.66
+    }
+}

@@ -120,7 +120,10 @@ class Detect(nn.Module):
 
         for i in range(self.nl):
             x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
-        if self.training:  # Training path
+
+        is_qat = getattr(self, "qat", False)
+
+        if self.training or is_qat:  # Training path
             return x
         y = self._inference(x)
         return y if self.export else (y, x)
@@ -453,7 +456,9 @@ class Detect3D(Detect):
         # 再走 Detect 的 2D 路径
         x_out = Detect.forward(self, x)
 
-        if self.training:
+        is_qat = getattr(self, "qat", False)
+
+        if self.training or is_qat:
             # 训练态保持“按层”返回，x_out 是 list[levels]（Detect 的行为）
             # 同步返回 extra3d_levels，方便逐层用正样本索引 gather
             return x_out, extra3d_levels

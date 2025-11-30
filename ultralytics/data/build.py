@@ -124,7 +124,7 @@ def seed_worker(worker_id: int):  # noqa
     random.seed(worker_seed)
 
 
-def build_yolo_dataset(
+def build_yolo_dataset_old(
     cfg: IterableSimpleNamespace,
     img_path: str,
     batch: int,
@@ -186,6 +186,127 @@ def build_yolo_dataset(
         output_shape=output_shape,
     )
 
+def build_yolo_dataset(
+    cfg: IterableSimpleNamespace,
+    img_path: str,
+    batch: int,
+    data: dict[str, Any],
+    mode: str = "train",
+    rect: bool = False,
+    stride: int = 32,
+    multi_modal: bool = False,
+):
+    """Build and return a YOLO dataset based on configuration parameters."""
+    
+    # 动态确定 dataset_class
+    dataset_class = YOLOMultiModalDataset if multi_modal else YOLODataset
+
+    # --- 新的双ROI & 多分辨率构建逻辑 ---
+    roi_configs = data.get("roi_configs")
+    # 仅在训练模式且 roi_configs 是一个列表时生效
+    if mode == "train" and isinstance(roi_configs, list) and len(roi_configs) > 1:
+        LOGGER.info(f"{colorstr('green', 'bold', 'Multi-ROI Training Enabled:')} Found {len(roi_configs)} ROI configurations.")
+        datasets = []
+        for i, roi_conf in enumerate(roi_configs):
+            roi_name = roi_conf.get("name", f"ROI-{i+1}")
+            LOGGER.info(f"Building dataset for {colorstr('blue', roi_name)}...")
+            
+            # --- 从每个 ROI 配置中解析参数 ---
+            # 您的代码已经支持 roi_policy 是一个字典
+            roi_policy_dict = roi_conf.get("roi_policy")
+
+            try:
+                roi_policy_obj = build_roi_policy_from_config(roi_conf["roi_policy"])
+            except Exception as e:
+                LOGGER.warning(f"{colorstr('yellow','bold')}Failed to build roi_policy from YAML: {e}. Using 'roi' if provided.")
+                roi_policy_obj = None
+
+            output_shape = roi_conf.get("output_shape")
+
+            # 注意：不再需要解析单一的 `roi` 字段，因为所有逻辑都在 `roi_policy` 中
+            
+            ds = dataset_class(
+                img_path=img_path,
+                imgsz=cfg.imgsz,
+                batch_size=batch,
+                augment=True,
+                hyp=cfg,
+                rect=cfg.rect or rect,
+                cache=cfg.cache or None,
+                single_cls=cfg.single_cls or False,
+                stride=stride,
+                pad=0.0,
+                prefix=colorstr(f"{mode} ({roi_name}): "),
+                task=cfg.task,
+                classes=cfg.classes,
+                data=data,
+                fraction=cfg.fraction,
+                
+                # --- 为每个数据集实例传入特定的 ROI 参数 ---
+                # `roi` 参数可以设为 None，因为所有逻辑都由 roi_policy 处理
+                roi=None, 
+                roi_policy=roi_policy_obj, 
+                output_shape=output_shape,
+                roi_name=roi_name,
+            )
+            datasets.append(ds)
+        
+        # 使用 YOLOConcatDataset (如果存在) 或标准 ConcatDataset 拼接
+        try:
+            from ultralytics.data.dataset import YOLOConcatDataset
+            return YOLOConcatDataset(datasets)
+        except ImportError:
+            from torch.utils.data import ConcatDataset
+            return ConcatDataset(datasets)
+
+    # --- 验证/测试或单ROI模式的逻辑 ---
+    # 如果不是训练模式，或 roi_configs 不存在/为空，则使用列表的第一个配置或旧的单一配置
+    roi_policy_dict = None
+    output_shape_val = None
+    roi_val = None
+    prefix_mode = mode
+
+    if isinstance(roi_configs, list) and len(roi_configs) > 0:
+        roi_conf = roi_configs[0]
+        roi_name = roi_conf.get("name", f"ROI-1")
+        LOGGER.info(f"Building dataset for {colorstr('blue', roi_name)}...")
+        roi_policy_dict = roi_conf.get("roi_policy")
+        output_shape_val = roi_conf.get("output_shape")
+        prefix_mode = f"{mode} ({roi_conf.get('name', 'Default_ROI')})"
+    else:
+        # Fallback to legacy single roi/roi_policy fields from the root of the data dict
+        roi_val = data.get("roi")
+        roi_policy_dict = data.get("roi_policy")
+        output_shape_val = data.get("output_shape")
+    
+    # 您的 `build_roi_policy_from_config` 逻辑可以放在这里，作用于 roi_policy_dict
+    try:
+        roi_policy_obj = build_roi_policy_from_config(roi_conf["roi_policy"])
+    except Exception as e:
+        LOGGER.warning(f"{colorstr('yellow','bold')}Failed to build roi_policy from YAML: {e}. Using 'roi' if provided.")
+        roi_policy_obj = None
+
+    return dataset_class(
+        img_path=img_path,
+        imgsz=cfg.imgsz,
+        batch_size=batch,
+        augment=mode == "train",
+        hyp=cfg,
+        rect=cfg.rect or rect,
+        cache=cfg.cache or None,
+        single_cls=cfg.single_cls or False,
+        stride=stride,
+        pad=0.0 if mode == "train" else 0.0,
+        prefix=colorstr(f"{prefix_mode}: "),
+        task=cfg.task,
+        classes=cfg.classes,
+        data=data,
+        fraction=cfg.fraction if mode == "train" else 1.0,
+        roi=roi_val,
+        roi_policy=roi_policy_obj,
+        output_shape=output_shape_val,
+        roi_name=roi_name,
+    )
 
 def build_grounding(
     cfg: IterableSimpleNamespace,

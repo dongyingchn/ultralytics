@@ -392,99 +392,6 @@ def build_name2id(names):
         print("build_name2id warnings:", *warnings, sep="\n - ")
     return name2id
 
-def _map_label_names_to_indices(lb: np.ndarray | list | None, names: dict | Iterable | None) -> np.ndarray:
-    """
-    Map string class tokens in `lb` (YOLO-format label array) to numeric indices using `names`.
-    Behaviors:
-      - If lb is None or empty -> returns empty float32 array with shape (0, ...)
-      - If lb dtype is numeric -> returns lb.astype(np.float32)
-      - If first column contains string tokens, map them to indices via names mapping.
-      - Accepts numeric strings like "0" as indices.
-      - Raises ValueError if a token cannot be mapped.
-    """
-    if lb is None:
-        return np.zeros((0, 5), dtype=np.float32)  # default shape if unknown
-    # Convert lists to numpy for uniform processing
-    if not isinstance(lb, np.ndarray):
-        try:
-            lb = np.asarray(lb)
-        except Exception:
-            # fallback: return empty
-            return np.zeros((0, 5), dtype=np.float32)
-
-    if lb.size == 0:
-        return lb.astype(np.float32)
-
-    # If first column already numeric, return casted array
-    if np.issubdtype(lb.dtype, np.number):
-        return lb.astype(np.float32)
-
-    # Build name->id mapping
-    name2id = _build_name2id(names)
-
-    # Prepare output as float32 with same number of columns as lb
-    cols = lb.shape[1] if lb.ndim == 2 else 1
-    try:
-        lb_str_first_col = lb[:, 0].astype(str)
-    except Exception:
-        # fallback: try flatten or single row
-        lb = lb.reshape(-1, cols)
-        lb_str_first_col = lb[:, 0].astype(str)
-
-    mapped_idxs = []
-    for raw in lb_str_first_col:
-        token = str(raw).strip().lower()
-        if token == "":
-            raise ValueError(f"Empty class token found in label; cannot map to index.")
-        # numeric string handling
-        if token.isdigit():
-            mapped_idxs.append(int(token))
-            continue
-        # direct mapping
-        if token in name2id:
-            mapped_idxs.append(name2id[token])
-            continue
-        # split tokens and try partial matches (underscores -> spaces)
-        parts = [p.strip() for p in token.replace("_", " ").split()]
-        found = False
-        for p in parts:
-            if p in name2id:
-                mapped_idxs.append(name2id[p])
-                found = True
-                break
-        if found:
-            continue
-        # fuzzy normalize (remove non-alphanum) and compare
-        norm_token = re.sub(r"[^a-z0-9]+", "", token)
-        for nm, idx in name2id.items():
-            if re.sub(r"[^a-z0-9]+", "", nm) == norm_token:
-                mapped_idxs.append(idx)
-                found = True
-                break
-        if found:
-            continue
-        # not resolved
-        raise ValueError(
-            f"Unable to map class label '{raw}' to an index. Provide mapping in data.yaml 'names' or use numeric ids."
-        )
-
-    # Build new lb array with mapped first column
-    # If lb had multiple columns, preserve them; else create minimal format (cls + zeros)
-    if lb.ndim == 1:
-        # single-row like ["car", x, y, w, h] may produce 1D array; reshape to (1, N)
-        lb = lb.reshape(1, -1)
-
-    lb_float = np.zeros(lb.shape, dtype=np.float32)
-    lb_float[:, 0] = np.array(mapped_idxs, dtype=np.float32)
-    # Try to copy remaining columns if they look numeric
-    for c in range(1, lb.shape[1]):
-        try:
-            lb_float[:, c] = lb[:, c].astype(np.float32)
-        except Exception:
-            # if cannot cast, set zeros
-            lb_float[:, c] = 0.0
-    return lb_float
-
 def verify_image_label_with_3D(args: tuple) -> list:
     """Verify one image-label pair.
     新增：当 args 最后一个布尔位为 True 时，解析 3D 标签并在返回值中追加 extra3d 字典（第 11 个返回项）。
@@ -589,12 +496,12 @@ def verify_image_label_with_3D(args: tuple) -> list:
                         cls_id = int(float(toks[0]))
                         L = len(toks)
                         # 行人/两轮车/骑行者：14 列，车辆：42 列，其余仅 2D：5 列
-                        if L == 18 and cls_id in {1, 2, 3}:
+                        if L == 18 and cls_id > 9 and cls_id <= 16:  # pedestrian/bicycle/motorcycle classes
                             base = np.array([float(x) for x in toks[5:14]], dtype=np.float32)
                             
                             labels_3d[j] = base
                             has_3d_mask[j] = True
-                        elif L == 50 and cls_id == 0:
+                        elif L == 50 and cls_id <= 9: # vehicle classes
                             base = np.array([float(x) for x in toks[5:14]], dtype=np.float32)
                             faces_flat = np.array([float(x) for x in toks[18:50]], dtype=np.float32)
                             faces_flat_tmp = faces_flat.reshape(4, 8)

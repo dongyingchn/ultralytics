@@ -15,11 +15,15 @@ from ultralytics.data import build_dataloader, build_yolo_dataset
 from ultralytics.engine.trainer import BaseTrainer
 from ultralytics.models import yolo
 from ultralytics.nn.tasks import DetectionModel
-from ultralytics.utils import DEFAULT_CFG, LOGGER, RANK
+from ultralytics.utils import DEFAULT_CFG, LOGGER, RANK, colorstr
 from ultralytics.utils.patches import override_configs
 from ultralytics.utils.plotting import plot_images, plot_labels
 from ultralytics.utils.torch_utils import torch_distributed_zero_first, unwrap_model
 
+from torch.utils.data import ConcatDataset
+from pathlib import Path
+import sys
+import importlib.util # 新增导入
 
 class DetectionTrainer(BaseTrainer):
     """
@@ -96,9 +100,67 @@ class DetectionTrainer(BaseTrainer):
         with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
             dataset = self.build_dataset(dataset_path, mode, batch_size)
         shuffle = mode == "train"
-        if getattr(dataset, "rect", False) and shuffle:
+        # original
+        # if getattr(dataset, "rect", False) and shuffle:
+        #     LOGGER.warning("'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
+        #     shuffle = True # False
+
+        # --- 新的、健ateur的 rect 检查逻辑 ---
+        is_rect = False
+        if isinstance(dataset, ConcatDataset):
+            # 如果任一子数据集是 rect, 则整体视为 rect
+            is_rect = any(getattr(subset, "rect", False) for subset in dataset.datasets)
+        else:
+            is_rect = getattr(dataset, "rect", False)
+
+        if is_rect and shuffle:
             LOGGER.warning("'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
-            shuffle = True # False
+            shuffle = True # 默认为 False
+
+        return build_dataloader(
+            dataset,
+            batch=batch_size,
+            workers=self.args.workers if mode == "train" else self.args.workers * 2,
+            shuffle=shuffle,
+            rank=rank,
+            drop_last=self.args.compile and mode == "train",
+        )
+    
+    def get_dataloader_for_qat(self, dataset_path: str, batch_size: int = 16, rank: int = 0, mode: str = "train"):
+        """
+        Construct and return dataloader for the specified mode.
+
+        Args:
+            dataset_path (str): Path to the dataset.
+            batch_size (int): Number of images per batch.
+            rank (int): Process rank for distributed training.
+            mode (str): 'train' for training dataloader, 'val' for validation dataloader.
+
+        Returns:
+            (DataLoader): PyTorch dataloader object.
+        """
+        assert mode in {"train", "val"}, f"Mode must be 'train' or 'val', not {mode}."
+        with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
+            # dataset = self.build_dataset(dataset_path, mode, batch_size)
+            dataset = build_yolo_dataset(self.args, dataset_path, batch_size, self.data, mode=mode, rect=True, stride=32)
+        shuffle = mode == "train"
+        # original
+        # if getattr(dataset, "rect", False) and shuffle:
+        #     LOGGER.warning("'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
+        #     shuffle = True # False
+
+        # --- 新的、健ateur的 rect 检查逻辑 ---
+        is_rect = False
+        if isinstance(dataset, ConcatDataset):
+            # 如果任一子数据集是 rect, 则整体视为 rect
+            is_rect = any(getattr(subset, "rect", False) for subset in dataset.datasets)
+        else:
+            is_rect = getattr(dataset, "rect", False)
+
+        if is_rect and shuffle:
+            LOGGER.warning("'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
+            shuffle = True # 默认为 False
+
         return build_dataloader(
             dataset,
             batch=batch_size,
@@ -161,6 +223,43 @@ class DetectionTrainer(BaseTrainer):
         Returns:
             (DetectionModel): YOLO detection model.
         """
+        # 1. cfg 是 Python 文件路径：使用 Python 构造模型
+        if isinstance(cfg, (str, Path)) and str(cfg).endswith(".py"):
+            path = Path(cfg)
+            if not path.is_file():
+                raise FileNotFoundError(f"Python model config file not found: {path}")
+
+            LOGGER.info(colorstr("model: ") + f"Loading Python model from '{path}'")
+
+            module_name = path.stem  # 例如 yolo11
+            spec = importlib.util.spec_from_file_location(module_name, path)
+            module = importlib.util.module_from_spec(spec)
+            assert spec.loader is not None
+            spec.loader.exec_module(module)
+
+            # 优先使用 build_model(args, data) 工厂函数
+            if hasattr(module, "build_model"):
+                build_fn = getattr(module, "build_model")
+                model = build_fn(self.args, self.data)
+                if not isinstance(model, nn.Module):
+                    raise TypeError(
+                        f"build_model(...) in {path} must return an nn.Module, got {type(model)} instead."
+                    )
+                LOGGER.info(colorstr("model: ") + f"Instantiated model via build_model() from '{path}'.")
+                return model
+
+            # 备选：尝试寻找 YOLO11DetectionModel 类
+            if hasattr(module, "YOLO11DetectionModel"):
+                ModelClass = getattr(module, "YOLO11DetectionModel")
+                model = ModelClass(args=self.args, nc=self.data["nc"], ch=self.data["channels"], scale="n")
+                LOGGER.info(colorstr("model: ") + f"Instantiated YOLO11DetectionModel from '{path}'.")
+                return model
+
+            raise ImportError(
+                f"Failed to construct model from Python file '{path}'. "
+                f"Expected a 'build_model(args, data)' function or 'YOLO11DetectionModel' class."
+            )
+        
         model = DetectionModel(cfg, nc=self.data["nc"], ch=self.data["channels"], verbose=verbose and RANK == -1)
         if weights:
             model.load(weights)
@@ -223,9 +322,46 @@ class DetectionTrainer(BaseTrainer):
         )
 
     def plot_training_labels(self):
-        """Create a labeled training plot of the YOLO model."""
-        boxes = np.concatenate([lb["bboxes"] for lb in self.train_loader.dataset.labels], 0)
-        cls = np.concatenate([lb["cls"] for lb in self.train_loader.dataset.labels], 0)
+
+        # original
+        # """Create a labeled training plot of the YOLO model."""
+        # boxes = np.concatenate([lb["bboxes"] for lb in self.train_loader.dataset.labels], 0)
+        # cls = np.concatenate([lb["cls"] for lb in self.train_loader.dataset.labels], 0)
+        # plot_labels(boxes, cls.squeeze(), names=self.data["names"], save_dir=self.save_dir, on_plot=self.on_plot)
+
+        # modified for ConcatDataset
+        if isinstance(self.train_loader.dataset, ConcatDataset):
+            # 如果是，则遍历所有子数据集并收集它们的 labels
+            all_labels = []
+            for subset in self.train_loader.dataset.datasets:
+                if hasattr(subset, 'labels'):
+                    all_labels.extend(subset.labels)
+                else:
+                    LOGGER.warning(f"A subset of the training dataset ({type(subset).__name__}) does not have a 'labels' attribute. Skipping for plotting.")
+            
+            if not all_labels:
+                LOGGER.warning("No labels found across all training dataset subsets. Cannot plot training labels.")
+                return
+            
+            labels_to_plot = all_labels
+        
+        elif hasattr(self.train_loader.dataset, 'labels'):
+            # 如果是单个数据集，则按原方式处理
+            labels_to_plot = self.train_loader.dataset.labels
+        
+        else:
+            # 数据集既不是 ConcatDataset，也没有 labels 属性
+            LOGGER.warning(f"Training dataset ({type(self.train_loader.dataset).__name__}) is not a ConcatDataset and has no 'labels' attribute. Cannot plot training labels.")
+            return
+
+        # 使用收集到的标签进行后续处理
+        try:
+            boxes = np.concatenate([lb["bboxes"] for lb in labels_to_plot], 0)
+            cls = np.concatenate([lb["cls"] for lb in labels_to_plot], 0)
+        except (ValueError, TypeError) as e:
+            LOGGER.error(f"Error concatenating labels for plotting: {e}. Check label format.")
+            return
+            
         plot_labels(boxes, cls.squeeze(), names=self.data["names"], save_dir=self.save_dir, on_plot=self.on_plot)
 
     def auto_batch(self):
@@ -237,6 +373,23 @@ class DetectionTrainer(BaseTrainer):
         """
         with override_configs(self.args, overrides={"cache": False}) as self.args:
             train_dataset = self.build_dataset(self.data["train"], mode="train", batch=16)
-        max_num_obj = max(len(label["cls"]) for label in train_dataset.labels) * 4  # 4 for mosaic augmentation
+        # max_num_obj = max(len(label["cls"]) for label in train_dataset.labels) * 4  # 4 for mosaic augmentation
+        # del train_dataset  # free memory
+        # return super().auto_batch(max_num_obj)
+            
+            # --- 新的、健壮的标签收集逻辑 ---
+        if isinstance(train_dataset, ConcatDataset):
+            all_labels = [label for subset in train_dataset.datasets if hasattr(subset, 'labels') for label in subset.labels]
+        elif hasattr(train_dataset, 'labels'):
+            all_labels = train_dataset.labels
+        else:
+            LOGGER.warning("auto_batch: Dataset has no 'labels' attribute. Using a default value for max_num_obj.")
+            all_labels = [{"cls": []}] # 提供一个默认值以避免崩溃
+            
+        if not all_labels:
+            max_num_obj = 0
+        else:
+            max_num_obj = max(len(label["cls"]) for label in all_labels) * 4  # 4 for mosaic augmentation
+        
         del train_dataset  # free memory
         return super().auto_batch(max_num_obj)

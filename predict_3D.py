@@ -234,12 +234,19 @@ def yuv444_bt601_full_range2rgb(src, img_w, img_h):
 
 # Load a model
 model_version = "minieye-driving-d4q-roi-multi_res-combined2"
-model_version = "minieye-driving-d4q-roi-multi_res-combined-proj_loss-face_vis"
+model_version = "minieye-driving-d4q-roi-multi_res-combined-proj_loss-face_vis3"
+model_version = "minieye-driving-d4q-two_ROI9"
+model_version = "minieye-driving-d4q-yolo11s_c2f_deconv-full_image-all"
+
+roi_region = 'full'
 
 pretrained_path = "/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect/train21/weights/best.pt"
 pretrained_path = f"/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/{model_version}/weights/best.pt"
 # model_version = pretrained_path.split('/')[-3]
 model = YOLO(pretrained_path)  # load a pretrained model, YOLO11n model
+
+if not hasattr(model.model, 'yaml'):
+    model.model.yaml = {"channels":3, "nc":37}
 
 # Run batched inference on a list of images
 
@@ -278,7 +285,12 @@ for img_path in img_list[:5]:
     # img = cv2.resize(img, (960, 540))
     h_img, w_img, _ = img.shape
 
-    ROI = [0, 160, 3840, 1696]  # x1,y1,x2,y2
+    if roi_region == 'full':
+        ROI = [0, 160, 3840, 1696]  # x1,y1,x2,y2
+    elif roi_region == 'wide':
+        ROI = [960, 680, 2880, 1448]
+    elif roi_region == 'tele':
+        ROI = [1440, 860, 2400, 1244]
     if ROI is not None:
         h_roi, w_roi = ROI[3] - ROI[1], ROI[2] - ROI[0]
     else:
@@ -347,15 +359,18 @@ for img_path in img_list[:5]:
                 # pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
 
                 x3d_new ,y3d_new = img_cam_kb(np.array([proj_pt[0],proj_pt[1]]).reshape((-1, 2)),intrinsic, distortion)
-                infer_x3d = x3d_new * base3d['z3d'][i]
-                infer_y3d = y3d_new * base3d['z3d'][i]
+                z3d = base3d['z3d'][i]
+                if roi_region == 'tele':
+                    z3d = z3d * 2.0
+                infer_x3d = x3d_new * z3d
+                infer_y3d = y3d_new * z3d
 
                 l3d, h3d, w3d = base3d['l3d'][i], base3d['h3d'][i], base3d['w3d'][i]
                 rot_y = base3d['rot_y'][i]
                 rot_y_cls = base3d['rot_y_cls'][i]
                 rot_y_res = base3d['rot_y_res'][i]
 
-                pred3d_cam = np.array([infer_x3d, infer_y3d, base3d['z3d'][i],
+                pred3d_cam = np.array([infer_x3d, infer_y3d, z3d,
                                     l3d, h3d, w3d,
                                     rot_y])
                 
@@ -378,15 +393,12 @@ for img_path in img_list[:5]:
 
                 print(f"face_scores: {face_scores}, face_idx: {face_idx}, cutcls_prob: {base3d['cutcls_prob'][i]}, cutcls: {cutcls}, 2d box: ({x1},{y1},{x2},{y2})")
 
-                # if cls[i] == 3:  # van
-                #     face_idx = 0
-
                 if cutcls == 1:
                     face_idx = 0  # front face
                 elif cutcls == 2:
                     face_idx = 1  # tail face
 
-                if face_scores[face_idx] > 0.2:
+                if cls[i] <= 9 and face_scores[face_idx] > 0.2: # 类别为车辆
 
                     # proj_px = int(round(faces3d['proj_offset_cell'][i][face_idx][0] * w_roi))
                     # proj_pt = (proj_px+ROI[0], y)
@@ -395,8 +407,11 @@ for img_path in img_list[:5]:
                     proj_pt = (proj_px+ROI[0], y)
 
                     x3d_new ,y3d_new = img_cam_kb(np.array([proj_pt[0],proj_pt[1]]).reshape((-1, 2)),intrinsic, distortion)
-                    infer_x3d = x3d_new * faces3d['z3d'][i][face_idx]
-                    infer_y3d = y3d_new * faces3d['z3d'][i][face_idx]
+                    z3d = faces3d['z3d'][i][face_idx]
+                    if roi_region == 'tele':
+                        z3d = z3d * 2.0
+                    infer_x3d = x3d_new * z3d
+                    infer_y3d = y3d_new * z3d
 
                     # pt_img_with_depth = np.array([[proj_pt[0]], [proj_pt[1]], [1]]) * faces3d['z3d'][i][face_idx]
                     # pt_cam = np.linalg.inv(intrinsic).dot(pt_img_with_depth)
@@ -416,7 +431,7 @@ for img_path in img_list[:5]:
                         facetype = 'right'
                         l, h, w = size[0], size[1], w3d
 
-                    pred3d_cam_face = np.array([infer_x3d, infer_y3d, faces3d['z3d'][i][face_idx],
+                    pred3d_cam_face = np.array([infer_x3d, infer_y3d, z3d,
                                                 l, h, w,
                                                 rot_y])
                 else:

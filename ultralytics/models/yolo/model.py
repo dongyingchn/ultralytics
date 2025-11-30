@@ -22,6 +22,12 @@ from ultralytics.nn.tasks import (
 )
 from ultralytics.utils import ROOT, YAML
 
+# === 新增导入 ===
+import sys
+import importlib.util
+from torch import nn
+from ultralytics.utils import LOGGER
+# =================
 
 class YOLO(Model):
     """
@@ -70,6 +76,61 @@ class YOLO(Model):
             >>> model = YOLO("yolo11n-seg.pt")  # load a pretrained YOLO11n segmentation model
         """
         path = Path(model if isinstance(model, (str, Path)) else "")
+
+        # 1. 检查是否为 .py 文件
+        if path.suffix == ".py":
+            LOGGER.info(f"Loading model from Python module: {path}")
+
+            # 手动初始化父类 Model 的属性
+            # super().__init__(model=None, task=task, verbose=verbose)
+            
+            # 手动初始化父类 Model 的属性，绕过其 _load 方法
+            self.model = None
+            self.trainer = None
+            self.ckpt = None
+            self.ckpt_path = None
+            self.overrides = {}
+            self.callbacks = {}
+            self.verbose = verbose
+            
+            try:
+                # 2. 动态导入 .py 文件
+                spec = importlib.util.spec_from_file_location(path.stem, path.resolve())
+                custom_module = importlib.util.module_from_spec(spec)
+                sys.modules[path.stem] = custom_module
+                spec.loader.exec_module(custom_module)
+
+                # 3. 自动查找并实例化模型类 (必须是 nn.Module 的子类)
+                model_class = None
+                for name, obj in custom_module.__dict__.items():
+                    if isinstance(obj, type) and issubclass(obj, nn.Module) and obj is not nn.Module:
+                        model_class = obj
+                        LOGGER.info(f"Found custom model class: {name}")
+                        break
+                
+                if model_class is None:
+                    raise ImportError(f"Could not find a valid nn.Module class in {path}")
+                
+                # 4. 实例化自定义模型并赋值给 self.model
+                #    假设构造函数有合理的默认值 (如 scale='n', nc=80)
+                self.model = model_class() 
+                self.ckpt_path = str(path)
+                
+                # 5. 手动设置任务类型 (非常重要)
+                #    尝试从模型实例中获取 'task' 属性，如果没有则默认为 'detect'
+                self.task = getattr(self.model, 'task', 'detect')
+                self.model.task = self.task
+                
+                LOGGER.info(f"Successfully loaded model '{model_class.__name__}' from '{path}'")
+                
+                # 6. 加载完成，直接返回，不再执行后续的原始逻辑
+                return
+
+            except Exception as e:
+                raise ImportError(f"Failed to load Python model from {path}. Error: {e}") from e
+        
+        # ==================== 新增/修改的代码块 END ======================
+
         if "-world" in path.stem and path.suffix in {".pt", ".yaml", ".yml"}:  # if YOLOWorld PyTorch model
             new_instance = YOLOWorld(path, verbose=verbose)
             self.__class__ = type(new_instance)

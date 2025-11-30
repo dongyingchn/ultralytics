@@ -74,7 +74,7 @@ class YOLODataset(BaseDataset):
         >>> dataset.get_labels()
     """
 
-    def __init__(self, *args, data: dict | None = None, task: str = "detect", roi=None, roi_policy=None, output_shape=None, **kwargs):
+    def __init__(self, *args, data: dict | None = None, task: str = "detect", roi=None, roi_policy=None, output_shape=None, roi_name=None, **kwargs):
         """
         Initialize the YOLODataset.
 
@@ -95,7 +95,10 @@ class YOLODataset(BaseDataset):
         # if isinstance(self.data, dict):
         #     roi = self.data.get("roi", None)  # expected form [x1, y1, x2, y2] or None
 
-        super().__init__(*args, channels=self.data.get("channels", 3), roi=roi, roi_policy=roi_policy, output_shape=output_shape, **kwargs)
+        # --- 新增：直接存储传递过来的 roi_name ---
+        self.roi_name = roi_name if roi_name else "default"
+
+        super().__init__(*args, channels=self.data.get("channels", 3), roi=roi, roi_policy=roi_policy, output_shape=output_shape, roi_name=roi_name, **kwargs)
 
     def cache_labels(self, path: Path = Path("./labels.cache")) -> dict:
         """
@@ -415,7 +418,7 @@ class YOLODataset(BaseDataset):
                 batch_idx=True,
                 mask_ratio=hyp.mask_ratio,
                 mask_overlap=hyp.overlap_mask,
-                bgr=hyp.bgr if self.augment else 0.0,  # only affect training.
+                bgr=hyp.bgr if self.augment else 1.0,  # only affect training.
             )
         )
         return transforms
@@ -477,7 +480,23 @@ class YOLODataset(BaseDataset):
         Returns:
             (dict): Collated batch with stacked tensors.
         """
+        roi_name_to_id = {
+            "Wide_ROI": 0,
+            "Tele_ROI": 1,
+        }
         new_batch = {}
+
+        # 1. 提取每个样本的 roi_name (假设它已由 get_image_and_label 注入)
+        # 注意：此处假设 BaseDataset.get_image_and_label 已经增加了 label['roi_name'] = self.roi_name
+        roi_names = [b.pop('roi_name', 'default') for b in batch]
+        
+        # 2. 将 roi_name 列表转换为 roi_id 列表
+        roi_ids = [roi_name_to_id.get(name, -1) for name in roi_names]
+        
+        # 3. 将 roi_id 列表放入 new_batch 中
+        # 它是一个与批次中的图片一一对应的列表
+        new_batch['roi_id'] = torch.tensor(roi_ids, dtype=torch.int8)
+        
         batch = [dict(sorted(b.items())) for b in batch]  # make sure the keys are in the same order
         keys = batch[0].keys()
         values = list(zip(*[list(b.values()) for b in batch]))

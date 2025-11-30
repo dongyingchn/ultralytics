@@ -175,4 +175,6 @@ pnnx*
 # calibration image
 calibration_*.npy
 
-output/
+output*/
+train_data*
+gt_vis*

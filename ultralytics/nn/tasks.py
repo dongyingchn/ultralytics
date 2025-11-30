@@ -291,7 +291,7 @@ class BaseModel(torch.nn.Module):
             (BaseModel): An updated BaseModel object.
         """
         self = super()._apply(fn)
-        m = self.model[-1]  # Detect()
+        m = self.model[-1] #self.detect #self.model[-1]  # Detect() self.model.detect #
         if isinstance(
             m, Detect
         ) or isinstance(m, Detect3D) or isinstance(m, Detect_with_3D):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect, YOLOEDetect, YOLOESegment

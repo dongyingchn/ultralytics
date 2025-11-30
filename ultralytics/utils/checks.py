@@ -535,6 +535,7 @@ def check_model_file_from_stem(model="yolo11n"):
     Returns:
         (str | Path): Model filename with appropriate suffix.
     """
+    if model is None: return None
     path = Path(model)
     if not path.suffix and path.stem in downloads.GITHUB_ASSETS_STEMS:
         return path.with_suffix(".pt")  # add suffix, i.e. yolo11n -> yolo11n.pt

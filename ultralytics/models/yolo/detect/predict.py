@@ -296,9 +296,9 @@ class DetectionPredictor(BasePredictor):
                         sel = per_img_vals[keep.cpu().numpy()]
                         out.append(sel)
                     except Exception:
-                        out.append(np.zeros((0, *per_img_vals.shape[1:]), dtype=per_img_vals.dtype))
+                        out.append(torch.zeros((0, *per_img_vals.shape[1:]), dtype=per_img_vals.dtype, device=per_img_vals.device))
             else:
-                out.append(np.zeros((0, *per_img_vals.shape[1:]), dtype=per_img_vals.dtype))
+                out.append(torch.zeros((0, *per_img_vals.shape[1:]), dtype=per_img_vals.dtype, device=per_img_vals.device))
         return out
 
     def _align_decoded_dicts(self, base_decoded_dict, faces_decoded_dict, idxs):
