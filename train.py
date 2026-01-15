@@ -12,7 +12,7 @@ SETTINGS["tensorboard"] = True
 model = YOLO("yolo11s-minieye-2d.yaml")  # build a new model from scratch
 # model = YOLO("/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/runs/detect_d4q/minieye-driving-d4q-yolo11s-full_image-all-lr0.002-depth50/weights/last.pt")  # build a new model from scratch
 
-measure_with_thop(model, input_size=(384,960), device='cuda' if torch.cuda.is_available() else 'cpu')
+measure_with_thop(model, input_size=(352, 704), device='cuda' if torch.cuda.is_available() else 'cpu')
 
 # results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=96, device=[0,1,2,3,4,5])  # train the model
 # results = model.train(data="minieye-driving-2d.yaml", epochs=100, imgsz=960, batch=32, device=[6,7])  # train the model
@@ -102,7 +102,7 @@ def load_partial_weights(model, ckpt_path=None, migrate_head_conv=False):
                         second_conv.bias.copy_(sd[k2b])
 
     init_weights(model.model[-1].cv3, init_type='kaiming')
-    init_weights(model.model[-1].cv4, init_type='kaiming')
+    # init_weights(model.model[-1].cv4, init_type='kaiming')
     # 初始化新增 3D 输出层（cv4 每个尺度最后一个 1×1 conv）
     # for seq in model.model[-1].cv4:
     #     out_conv = seq[-1]
@@ -112,27 +112,27 @@ def load_partial_weights(model, ckpt_path=None, migrate_head_conv=False):
 
     return model
 
-# model.model = load_partial_weights(
-#     model.model,
-#     ckpt_path="/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11s.pt",
-#     migrate_head_conv=False,
-# )
+model.model = load_partial_weights(
+    model.model,
+    ckpt_path="/deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/yolo11s.pt",
+    migrate_head_conv=False,
+)
 
-results = model.train(data="minieye-driving-D4Q.yaml", imgsz=960, 
+results = model.train(data="minieye-driving-G1M3.yaml", imgsz=960, 
                     batch=512, device=[0,1,2,3,4,5,6,7], 
                     # batch=8, device=[0,1], 
-                    workers=6,
-                    epochs=300, 
+                    workers=16,
+                    epochs=100, 
                     lr0=0.01,
-                    lrf=0.001,
+                    lrf=0.01,
                     cls=0.8, # original 0.5
                     bgr=1,
                     optimizer='SGD',
                     cos_lr=True,
                     rect=True,
-                    project='runs/detect_d4q',
-                    name='minieye-driving-d4q-yolo11s-full_image-all-lr0.01-depth50-cls0.8',
-                    train_3d=True,
+                    project='runs/detect_g1m3',
+                    name='minieye-driving-yolo11s-full_image-all-lr0.01-depth50-cls0.8-v2',
+                    train_3d=False,
                     resume=False,)  # train the model
 
 # test two ROI

@@ -16,7 +16,7 @@
 
 path: /deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/train_data/D4Q # dataset root dir
 train: train_all.txt #train_20251114_195583.txt # train images (relative to 'path') 4 images
-val: val_20251114_21732.txt # val images (relative to 'path') 4 images
+val: val_20251114_21732.txt # val images (relative to 'path') 4 images #val_D4Q_33_20250530_16465.txt #
 test: # test images (optional)
 
 # Classes

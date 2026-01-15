@@ -163,7 +163,7 @@ def eval_tp_fp_3drelategap(num_class, gtresult, dtresult, gtcount):
 
     return precision, recall, aps, conf, lx3d, ldepth, lheading, dis_x3d, dis_depth, dis_heading, num_distance
 
-def gttransfor3d(textlists, class_names_str2id):
+def gttransfor3d(textlists, class_names_str2id, roi):
     gtresult = {}
     gtcount = {}
     # textlists = glob.glob(os.path.join(label_dir, '*.txt'))
@@ -186,6 +186,15 @@ def gttransfor3d(textlists, class_names_str2id):
             y1 = (y_center - h / 2) * h_img
             x2 = (x_center + w / 2) * w_img
             y2 = (y_center + h / 2) * h_img
+
+            # --- ROI Clipping Logic ---
+            if roi is not None:
+                roi_x1, roi_y1, roi_x2, roi_y2 = roi
+                x1 = max(x1, roi_x1)
+                y1 = max(y1, roi_y1)
+                x2 = min(x2, roi_x2)
+                y2 = min(y2, roi_y2)
+
             box = [x1, y1, x2, y2]
 
             h_box = y2 - y1
@@ -656,7 +665,7 @@ def run_evaluation(model, img_list, calib_root, args):
 
     label_list = [img_path.replace('/images/', '/labels/').replace('.jpg', '.txt') for img_path in img_list]
     
-    gtresult, gtcount = gttransfor3d(label_list, args.class_names_str2id)
+    gtresult, gtcount = gttransfor3d(label_list, args.class_names_str2id, roi=[0, 160, 3840, 1696])
     dtresult = {}
     num_class = model.model.nc
 
@@ -765,7 +774,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="YOLOv11 3D Prediction and Evaluation")
     parser.add_argument('--model-path', type=str, default='./runs/detect_d4q/minieye-driving-d4q-yolo11s-full_image-all-lr0.01-depth50-cls0.82/weights/best.pt', help="Path to the pretrained .pt model file.")
     parser.add_argument('--img-list', type=str, default='./train_data/D4Q/val_D4Q_33_20250530_16465.txt', help="Path to a text file containing a list of image paths.")
-    parser.add_argument('--mode', type=str, choices=['eval', 'vis'], default='vis', help="'eval' for 3D metrics, 'vis' for visualization.")
+    parser.add_argument('--mode', type=str, choices=['eval', 'vis'], default='eval', help="'eval' for 3D metrics, 'vis' for visualization.")
     parser.add_argument('--device', type=str, default='0', help='Device for inference, e.g., "0" for GPU 0, or "cpu".')
     parser.add_argument('--calib-root', type=str, default="/data1/dongying/Mono3d/D4Q_33/", help="Root directory for calibration files.")
     parser.add_argument('--output-dir', type=str, default="./output_val", help="Directory to save visualization results.")
@@ -810,6 +819,6 @@ if __name__ == '__main__':
     os.makedirs(output_dir_final, exist_ok=True)
     
     if args.mode == 'vis':
-        run_prediction_and_visualization(model, img_list[:10], args.calib_root, output_dir_final, args)
+        run_prediction_and_visualization(model, img_list[:20], args.calib_root, output_dir_final, args)
     elif args.mode == 'eval':
         run_evaluation(model, img_list[:], args.calib_root, args)

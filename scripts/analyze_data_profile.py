@@ -1,3 +1,4 @@
+      
 import os
 import glob
 import math
@@ -8,10 +9,21 @@ from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+# import xlsxwriter
+
+from typing import Dict, List, Tuple
+
+import warnings
+warnings.filterwarnings("ignore")
+sns.set(style="whitegrid", context="notebook")
+
 def gen_train_data_list():
-    data_dir = "/mnt/mono3d/swji_data/Mono3d_4face_8m_d4q_bt601full" # train
-    
-    save_dir = "./train_data_mono3d_D4Q/train/20251110"
+    data_dir = "/mnt/mono3d/swji_data/Mono3d_4face_8m_d4q_bt601full_update_2d3d" # train
+    save_dir = "./train_data_mono3d_D4Q/train/20251210"
+
+    data_dir = "/data1/dongying/Mono3d/eval_dataset/D4Q_multicls"
+    save_dir = "./train_data_mono3d_D4Q/val"
+
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -47,6 +59,7 @@ def gen_train_data_list():
 def gen_val_data_list():
     
     data_dir = "/deeplearning_team/ydong/jisiwen/179/MinieyeProject/test_data" # val
+    data_dir = "/data1/dongying/Mono3d/eval_dataset/D4Q_multicls"
     save_dir = "./train_data_mono3d_D4Q/val"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -110,10 +123,13 @@ def parse_label_file(file_path):
     with open(file_path, 'r') as f:
         img_paths = f.readlines()
 
-    txt_paths = [img_path.strip().replace('/images/', '/labels_dealmult/').replace('.jpg', '.txt') for img_path in img_paths]
+    txt_paths = [img_path.strip().replace('/images/', '/labels/').replace('.jpg', '.txt') for img_path in img_paths]
     
     data = []
     for txt_path in tqdm(txt_paths, desc=f"解析文件 {os.path.basename(file_path)} 中的标签"):
+
+        if not os.path.exists(txt_path):
+            continue
     
         with open(txt_path, 'r') as f:
             for line in f:
@@ -203,8 +219,8 @@ def cache_gt_statistics(mode='train', chunk_size=10):
 
     if mode == 'train':
 
-        data_list_dir = "./train_data_mono3d_D4Q/train/20251110/data_list"
-        cache_dir = "./train_data_mono3d_D4Q/train/20251110/label_cache"
+        data_list_dir = "./train_data_mono3d_D4Q/val/data_list"
+        cache_dir = "./train_data_mono3d_D4Q/val/label_cache"
         
         cate_list = os.listdir(data_list_dir)
         cate_list.sort()
@@ -309,24 +325,60 @@ CONFIG = {
     # # 存放 .pkl 缓存文件的根目录
     "cache_dir": "./train_data_mono3d_D4Q/train/20251110/label_cache", 
     # 报表和图像的输出目录
-    "output_dir": "./train_data_mono3d_D4Q/train/20251110/cache_data_profile_output_v2",
+    "output_dir": "./train_data_mono3d_D4Q/train/20251110/cache_data_profile_output_v3",
 
     # "cache_dir": "./train_data_mono3d_D4Q/val/label_cache",
     # "output_dir": "./train_data_mono3d_D4Q/val/cache_data_profile_output",
-
-    # 新增：X轴距离统计的配置（范围[-50, 50]，间隔10）
-    "x_distribution": {
-        "min_dist": -50,
-        "max_dist": 50,
-        "interval": 10,
-    },
-
     # Z轴距离统计的配置
     "z_distribution": {
         "max_dist": 200,  # 分析的最大距离
         "interval": 10,   # 每个区间的宽度
     },
+    # # "z_dist_target_classes": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"],
+    # "z_dist_target_classes": [
+    #     "car",  "tinycar", "bus", "van", "truck","tanker", "large_truck", "construction_vehicle","special_vehicle", "unknown",
+    #     'pedestrian', 'bicycle', "bicyclist",
+    #     "motorcycle", "motorcyclist", "tricycle", "tricyclist",
+    #     ],
+
     "z_dist_target_classes": ["0", "1", "2", "3"],
+    "class_names": {
+        "0": "vehicle",
+        "1": "pedestrian",
+        "2": "bicycle",
+        "3": "cyclist",
+    },
+
+    # 新增：X轴距离统计的配置（范围[-50, 50]，间隔10）
+    "x_distribution": {
+        "min_dist": -80,
+        "max_dist": 80,
+        "interval": 10,
+    },
+
+    # "labelnames": [
+    #     "car",  "tinycar", "bus", "van", "truck","tanker", "large_truck", "construction_vehicle","special_vehicle", "unknown",
+    #     'pedestrian', 'bicycle', "bicyclist",
+    #     "motorcycle", "motorcyclist", "tricycle", "tricyclist",
+    #     'traffic_light_bbox', 'traffic_light_bulb',
+    #     'traffic_sign', 'animal', 'movable_object',
+    #     'warning_triangle', 'traffic_cone', 'water_barrier', 'crash_barrel',
+    #     'movable_barrier', 'bollard', 'sphere_bollard', 'cube_bollard',
+    #     'cylinder_bollard', 'construction_barrier', 'other_barrier',
+    #     'road_barrier_unknown', "wheel", "plate", "face"
+    # ],
+    # "class_names": {
+    #     "0": "car", "1": "tinycar", "2": "bus", "3": "van", "4": "truck", "5": "tanker", "6": "large_truck", "7": "construction_vehicle", "8": "special_vehicle", "9": "unknown",
+    #     "10": "pedestrian", "11": "bicycle", "12": "bicyclist",
+    #     "13": "motorcycle", "14": "motorcyclist", "15": "tricycle", "16": "tricyclist",
+    #     # "17": "traffic_light_bbox", "18": "traffic_light_bulb",
+    #     # "19": "traffic_sign", "20": "animal", "21": "movable_object",
+    #     # "22": "warning_triangle", "23": "traffic_cone", "24": "water_barrier", "25": "crash_barrel",
+    #     # "26": "movable_barrier", "27": "bollard", "28": "sphere_bollard", "29": "cube_bollard",
+    #     # "30": "cylinder_bollard", "31": "construction_barrier", "32": "other_barrier",
+    #     # "33": "road_barrier_unknown", "34": "wheel", "35": "plate", "36": "face"
+    # },
+    "labelnames": ["0", "1", "2", "3"],
     "class_names": {
         "0": "vehicle",
         "1": "pedestrian",
@@ -336,6 +388,30 @@ CONFIG = {
 }
 # --- 主配置区结束 ---
 
+def ensure_dir(path: str):
+    os.makedirs(path, exist_ok=True)
+
+
+# def get_bins_and_labels(max_dist: int, interval: int) -> Tuple[np.ndarray, List[str]]:
+#     bins = np.arange(0, max_dist + interval, interval)
+#     labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins) - 1)]
+#     return bins, labels
+
+def get_bins_and_labels(min_dist: float, max_dist: float, interval: float) -> Tuple[np.ndarray, List[str]]:
+    """
+    通用的分箱与标签构造器，可支持负区间。
+    """
+    bins = np.arange(min_dist, max_dist + interval, interval)
+    labels = [f"[{bins[i]}, {bins[i+1]})" for i in range(len(bins) - 1)]
+    return bins, labels
+
+def normalize_class_name(value, class_names_map: Dict[str, str]):
+    """
+    将可能为数字字符串的类别标识转换为类别名；否则原样返回。
+    """
+    if isinstance(value, str) and value.isdigit() and value in class_names_map:
+        return class_names_map[value]
+    return value
 
 def load_all_cached_labels(cache_dir):
     """
@@ -344,7 +420,7 @@ def load_all_cached_labels(cache_dir):
     if '/train/' in cache_dir:
         all_pkl_files = glob.glob(os.path.join(cache_dir, '**', '*.pkl'), recursive=True)
     elif '/val/' in cache_dir:
-        all_pkl_files = glob.glob(os.path.join(cache_dir, '*', '*.pkl'))
+        all_pkl_files = glob.glob(os.path.join(cache_dir, '**', '*.pkl'), recursive=True)
     
     if not all_pkl_files:
         raise FileNotFoundError(f"在目录 '{cache_dir}' 及其子目录中未找到任何 .pkl 缓存文件。")
@@ -381,6 +457,236 @@ def load_all_cached_labels(cache_dir):
     df_dict['all-scene'] = combined_df
     return df_dict
 
+def compute_class_counts(df: pd.DataFrame, labelnames: List[str]) -> pd.Series:
+    """
+    统计给定 DataFrame 中各类别的数量，按 labelnames 排序，未出现的类别补0。
+    返回一个以类别为索引的 Series。
+    """
+    if 'class_name' not in df.columns:
+        raise KeyError("数据缺少 'class_name' 列，无法统计类别数量。")
+
+    counts = df['class_name'].value_counts()
+    # 按 labelnames 顺序对齐
+    counts = counts.reindex(labelnames).fillna(0).astype(int)
+    return counts
+
+
+def save_class_count_tables(df: pd.DataFrame, output_dir: str, key: str, labelnames: List[str]) -> pd.DataFrame:
+    """
+    为 (2D+3D)、2D、3D 分别统计类别目标数量，输出为一个合并表并保存为 Excel 和 CSV。
+    返回合并的 DataFrame：index=class_name, columns=['all','2D','3D']。
+    """
+    ensure_dir(output_dir)
+
+    all_counts = compute_class_counts(df, labelnames)
+    counts_2d = compute_class_counts(df[df.get('type', '') == '2D'], labelnames)
+    counts_3d = compute_class_counts(df[df.get('type', '') == '3D'], labelnames)
+
+    combined = pd.DataFrame({
+        'all': all_counts,
+        '2D': counts_2d,
+        '3D': counts_3d
+    })
+    # 去除全为0的行（可选）
+    # combined = combined[(combined.sum(axis=1) > 0)]
+
+    excel_path = os.path.join(output_dir, f'class_counts_{key}.xlsx')
+    csv_path = os.path.join(output_dir, f'class_counts_{key}.csv')
+
+    # with pd.ExcelWriter(excel_path, engine='xlsxwriter') as writer:
+    #     combined.to_excel(writer, sheet_name='counts')
+    #     # 附带总计行
+    #     totals = pd.DataFrame(combined.sum(axis=0)).T
+    #     totals.index = ['TOTAL']
+    #     totals.to_excel(writer, sheet_name='summary')
+
+    combined.to_csv(csv_path, index=True, encoding='utf-8-sig')
+
+    print(f"类别数量统计表已导出：\n- {excel_path}\n- {csv_path}")
+    return combined
+
+
+def build_z_distribution_tables(
+    df_3d: pd.DataFrame,
+    bins: np.ndarray,
+    labels: List[str],
+    class_list: List[str],
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    构建3D目标的Z轴分布统计表（计数和百分比）。
+    - 行索引为距离区间 labels
+    - 列为 'all' 加上各类别
+    """
+    if df_3d.empty:
+        # 返回空表结构
+        idx = pd.Index(labels, name='z_interval')
+        return pd.DataFrame(index=idx), pd.DataFrame(index=idx)
+
+    df_3d = df_3d.copy()
+    df_3d['z_interval'] = pd.cut(df_3d['z3d_ori'], bins=bins, labels=labels, right=False)
+
+    # 所有3D目标
+    all_counts = df_3d['z_interval'].value_counts().reindex(labels).fillna(0).astype(int)
+    result_counts = pd.DataFrame({'all': all_counts})
+
+    # 各类别
+    for cname in class_list:
+        sub = df_3d[df_3d['class_name'] == cname]
+        sub_counts = sub['z_interval'].value_counts().reindex(labels).fillna(0).astype(int)
+        result_counts[cname] = sub_counts
+
+    # 百分比（按列归一化）
+    result_percentage = result_counts.copy().astype(float)
+    for col in result_percentage.columns:
+        col_sum = result_percentage[col].sum()
+        if col_sum > 0:
+            result_percentage[col] = (result_percentage[col] / col_sum) * 100.0
+        else:
+            result_percentage[col] = 0.0
+
+    result_counts.index.name = 'z_interval'
+    result_percentage.index.name = 'z_interval'
+    return result_counts, result_percentage
+
+
+def save_z_distribution_tables(
+    df: pd.DataFrame,
+    output_dir: str,
+    key: str,
+    target_classes: List[str],
+    labelnames: List[str],
+):
+    """
+    生成并保存3D目标的Z轴分布统计到单个表格（包含所有目标与各类别）。
+    输出一个 Excel（counts + percentage 两个sheet）与一个 CSV（counts）。
+    """
+    ensure_dir(output_dir)
+
+    # 仅3D目标
+    df_3d = df[df.get('type', '') == '3D'].copy()
+    if df_3d.empty:
+        print("无3D目标，跳过Z轴分布表格导出。")
+        return
+
+    # 选择统计的类别列
+    if target_classes:
+        class_list = [normalize_class_name(c, CONFIG['class_names']) for c in target_classes]
+    else:
+        # 对实际出现的所有3D类别统计
+        class_list = sorted(df_3d['class_name'].dropna().unique().tolist(),
+                            key=lambda x: (labelnames.index(x) if x in labelnames else 1e9, x))
+
+    # 分箱
+    max_dist = CONFIG["z_distribution"]["max_dist"]
+    interval = CONFIG["z_distribution"]["interval"]
+    bins, labels = get_bins_and_labels(0, max_dist, interval)
+
+    # 构建表格
+    # z_counts, z_percentage = build_z_distribution_tables(df_3d, bins, labels, class_list)
+    z_counts, z_percentage = build_axis_distribution_tables(df_3d, 'z3d_ori', bins, labels, class_list)
+
+    # 保存
+    excel_path = os.path.join(output_dir, f'z_dist_3d_{key}.xlsx')
+    csv_path = os.path.join(output_dir, f'z_dist_3d_{key}.csv')
+
+    # with pd.ExcelWriter(excel_path, engine='xlsxwriter') as writer:
+    #     z_counts.to_excel(writer, sheet_name='counts')
+    #     z_percentage.to_excel(writer, sheet_name='percentage')
+
+    z_counts.to_csv(csv_path, index=True, encoding='utf-8-sig')
+
+    print(f"3D目标Z轴分布统计表已导出：\n- {excel_path}\n- {csv_path}")
+
+def build_axis_distribution_tables(
+    df_3d: pd.DataFrame,
+    value_col: str,
+    bins: np.ndarray,
+    labels: List[str],
+    class_list: List[str],
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    通用构建3D目标的轴向分布统计表（计数和百分比）。
+    - value_col: 使用的数值列（如 'z3d_ori' 或 'x3d_ori'）
+    - 行索引为距离区间 labels
+    - 列为 'all' 加上各类别
+    """
+    if df_3d.empty or value_col not in df_3d.columns:
+        idx = pd.Index(labels, name='interval')
+        return pd.DataFrame(index=idx), pd.DataFrame(index=idx)
+
+    df_3d = df_3d.copy()
+    df_3d['interval'] = pd.cut(df_3d[value_col], bins=bins, labels=labels, right=False)
+
+    # 所有3D目标
+    all_counts = df_3d['interval'].value_counts().reindex(labels).fillna(0).astype(int)
+    result_counts = pd.DataFrame({'all': all_counts})
+
+    # 各类别
+    for idx_class, cname in enumerate(class_list):
+        sub = df_3d[df_3d['class_name'] == str(idx_class)]
+        sub_counts = sub['interval'].value_counts().reindex(labels).fillna(0).astype(int)
+        result_counts[cname] = sub_counts
+
+    # 百分比（按列归一化）
+    result_percentage = result_counts.copy().astype(float)
+    for col in result_percentage.columns:
+        col_sum = result_percentage[col].sum()
+        if col_sum > 0:
+            result_percentage[col] = (result_percentage[col] / col_sum) * 100.0
+        else:
+            result_percentage[col] = 0.0
+
+    result_counts.index.name = 'interval'
+    result_percentage.index.name = 'interval'
+    return result_counts, result_percentage
+
+def save_x_distribution_tables(
+    df: pd.DataFrame,
+    output_dir: str,
+    key: str,
+    target_classes: List[str],
+    labelnames: List[str],
+):
+    """
+    生成并保存3D目标的X轴分布统计到单个表格（包含所有目标与各类别）。
+    范围[-50, 50]，间隔10；输出一个 Excel（counts + percentage 两个sheet）与一个 CSV（counts）。
+    """
+    ensure_dir(output_dir)
+
+    # 仅3D目标
+    df_3d = df[df.get('type', '') == '3D'].copy()
+    if df_3d.empty:
+        print("无3D目标，跳过X轴分布表格导出。")
+        return
+
+    # 选择统计的类别列
+    if target_classes:
+        class_list = [normalize_class_name(c, CONFIG['class_names']) for c in target_classes]
+    else:
+        # 对实际出现的所有3D类别统计
+        class_list = sorted(df_3d['class_name'].dropna().unique().tolist(),
+                            key=lambda x: (labelnames.index(x) if x in labelnames else 1e9, x))
+
+    # 分箱（X轴支持负区间）
+    min_dist = CONFIG["x_distribution"]["min_dist"]
+    max_dist = CONFIG["x_distribution"]["max_dist"]
+    interval = CONFIG["x_distribution"]["interval"]
+    bins, labels = get_bins_and_labels(min_dist, max_dist, interval)
+
+    # 构建表格
+    x_counts, x_percentage = build_axis_distribution_tables(df_3d, 'x3d_ori', bins, labels, class_list)
+
+    # 保存
+    excel_path = os.path.join(output_dir, f'x_dist_3d_{key}.xlsx')
+    csv_path = os.path.join(output_dir, f'x_dist_3d_{key}.csv')
+
+    # with pd.ExcelWriter(excel_path, engine='xlsxwriter') as writer:
+    #     x_counts.to_excel(writer, sheet_name='counts')
+    #     x_percentage.to_excel(writer, sheet_name='percentage')
+
+    x_counts.to_csv(csv_path, index=True, encoding='utf-8-sig')
+
+    print(f"3D目标X轴分布统计表已导出：\n- {excel_path}\n- {csv_path}")
 
 def plot_z_distribution(df, output_dir, target_class=None, class_names=None, key=None):
     """
@@ -392,7 +698,10 @@ def plot_z_distribution(df, output_dir, target_class=None, class_names=None, key
     df_3d = df[df['type'] == '3D'].copy()
 
     if target_class:
-        class_name = class_names[target_class]
+        if target_class.isdigit():
+            class_name = class_names[target_class]
+        else:
+            class_name = target_class
         title_prefix = f'类别 "{class_name}" 的'
         filename_prefix = f'z_dist_{key}_{class_name}'
         df_3d = df_3d[df_3d['class_name'] == target_class]
@@ -503,24 +812,123 @@ def main():
         print("\n--- 按类型细分 ---")
         print(f"3D 目标总数: {type_counts.get('3D', 0)}")
         print(f"纯2D 目标总数: {type_counts.get('2D', 0)}")
-        
-        # 调用Z轴距离分布统计函数
-        plot_z_distribution(combined_df, output_dir, target_class=None, class_names=CONFIG['class_names'], key=key)
 
-        # 2. 为指定的几个类别，单独绘制Z轴分布图
-        target_classes = CONFIG["z_dist_target_classes"]
-        if not target_classes: # 如果列表为空，则为所有存在的3D类别生成
-            target_classes = combined_df[combined_df['type'] == '3D']['class_name'].unique()
+        # 1) 生成 (2D+3D)、2D、3D 的类别数量统计表（单文件）
+        class_count_df = save_class_count_tables(
+            combined_df,
+            output_dir=output_dir,
+            key=key,
+            labelnames=CONFIG['labelnames'],
+        )
+
+        # 2) 生成 3D 目标 Z 轴分布统计汇总表（单文件包含所有目标及各类别）
+        target_classes = CONFIG.get("z_dist_target_classes", [])
+        save_z_distribution_tables(
+            combined_df,
+            output_dir=output_dir,
+            key=key,
+            target_classes=target_classes,
+            labelnames=CONFIG['labelnames'],
+        )
+
+        # 3) 生成 3D 目标 X 轴分布统计汇总表（单文件包含所有目标及各类别）
+        save_x_distribution_tables(
+            combined_df,
+            output_dir=output_dir,
+            key=key,
+            target_classes=target_classes,  # 与Z轴同样使用该类别列表
+            labelnames=CONFIG['labelnames'],
+        )
+
+        # 3) 绘制 Z 轴距离分布柱状图
+        # 调用Z轴距离分布统计函数
+        # plot_z_distribution(combined_df, output_dir, target_class=None, class_names=CONFIG['class_names'], key=key)
+
+        # # 2. 为指定的几个类别，单独绘制Z轴分布图
+        # target_classes = CONFIG["z_dist_target_classes"]
+        # if not target_classes: # 如果列表为空，则为所有存在的3D类别生成
+        #     target_classes = combined_df[combined_df['type'] == '3D']['class_name'].unique()
             
-        for class_name in target_classes:
-            plot_z_distribution(combined_df, output_dir, target_class=class_name, class_names=CONFIG['class_names'], key=key)
+        # for class_name in target_classes:
+        #     plot_z_distribution(combined_df, output_dir, target_class=class_name, class_names=CONFIG['class_names'], key=key)
         
-        print(f"\n{key}数据画像分析完成！")
+        # print(f"\n{key}数据画像分析完成！")
+
+def count_day_night():
+
+    label_path = "/mnt/mono3d/swji_data/Mono3d_4face_8m_d4q_bt601full/scene_label/dn_all.txt"
+    with open(label_path, 'r') as f:
+        lines = f.readlines()
+    label_dict = {}
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) >= 2:
+            label_dict[parts[0]] = parts[1]
+
+    data_list_dir = "./train_data_mono3d_D4Q/val/data_list"
+    
+    cate_list = os.listdir(data_list_dir)
+    cate_list.sort()
+
+    day_count = 0
+    night_count = 0
+    unknown = 0
+
+    for cate_name in cate_list:
+        # if cate_name in ["CNCAP", "driving"]:
+        #     continue
+        cate_dir = os.path.join(data_list_dir, cate_name)
+        vehicle_list = os.listdir(cate_dir)
+        vehicle_list.sort()
+
+        for vehicle_name in vehicle_list:
+
+            # if vehicle_name not in ['D4Q_51']:
+            #     continue
+            vehicle_dir = os.path.join(cate_dir, vehicle_name)
+
+            # 找到该车辆下的所有 .txt 文件
+            date_files = sorted(glob.glob(os.path.join(vehicle_dir, '*.txt')))
+
+            for date_file in date_files:
+
+                with open(date_file, 'r') as f:
+                    img_paths = f.readlines()
+
+                for img_path in img_paths:
+                    img_name = os.path.basename(img_path).strip()
+
+                    key = img_name.split('_camera4_')[0]
+
+                    label = label_dict.get(key, 'unknown')
+                    if label == 'day':
+                        day_count += 1
+                    elif label == 'night':
+                        night_count += 1
+                    else:
+                        unknown += 1
+
+        # 绘制饼图
+        labels = ['Day', 'Night', 'Unknown']
+        sizes = [day_count, night_count, unknown]
+        colors = ['#FFD700', '#1E90FF', '#D3D3D3']
+        plt.figure(figsize=(8, 8))
+        plt.pie(sizes, labels=labels, colors=colors,
+            autopct=lambda p: '{:.0f} ({:.1f}%)'.format(p * sum(sizes) / 100, p), shadow=False, startangle=140)
+        plt.title('Day vs Night Image Distribution', fontsize=16)
+        plt.axis('equal')  # 使饼图为圆形
+        # 图例中显示类别和数据
+        plt.legend(labels + [f'{day_count}', f'{night_count}', f'{unknown}'], title="Categories", loc="best")
+        plt.savefig('day_night_distribution.png', dpi=200)
 
 if __name__ == "__main__":
     # gen_train_data_list()
     # gen_val_data_list()
     # get_data_statistics()
-    # cache_gt_statistics(mode='val')
+    # cache_gt_statistics(mode='train')
 
     main()
+
+    # count_day_night()
+
+    

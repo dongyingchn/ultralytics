@@ -1252,11 +1252,17 @@ class v8Detection3DLoss:
 
             # ---- 基础3D：仅在 has3d 上监督（稳定均值化）
             m = has3d_pos
+
+            depth_mask = gt_base_pos[:, 2] <= 50.0
+            lateral_mask = torch.abs(gt_base_pos[:, 0]) < 35.0
+            height_mask = torch.abs(gt_base_pos[:, 1]) < 10.0
+            m = m & depth_mask & lateral_mask & height_mask
+
             if m.any():
-                depth_mask = gt_base_pos[:, 2] <= 50.0
-                lateral_mask = torch.abs(gt_base_pos[:, 0]) < 35.0
-                height_mask = torch.abs(gt_base_pos[:, 1]) < 10.0
-                m = m & depth_mask & lateral_mask & height_mask
+                # depth_mask = gt_base_pos[:, 2] <= 50.0
+                # lateral_mask = torch.abs(gt_base_pos[:, 0]) < 35.0
+                # height_mask = torch.abs(gt_base_pos[:, 1]) < 10.0
+                # m = m & depth_mask & lateral_mask & height_mask
 
                 m_sum = m.sum().clamp_min(1)
                 # xyz, lwh, proj 以元素均值统计；旋转使用角度损失

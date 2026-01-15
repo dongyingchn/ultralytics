@@ -14,69 +14,101 @@
 # val: images/val # val images (relative to 'path') 4 images
 # test: # test images (optional)
 
-path: /deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/train_data # dataset root dir
-train: val.txt # train images (relative to 'path') 4 images
-val: val.txt # val images (relative to 'path') 4 images
-test: # test images (optional)
+# path: /deeplearning_team/ydong/dongying/projects/monocular_3d_object_detection/ultralytics/train_data # dataset root dir
+# train: val.txt # train images (relative to 'path') 4 images
+# val: val.txt # val images (relative to 'path') 4 images
+# test: # test images (optional)
+
+path: /mnt/mono3d_nfs/xdzhu_data/Detection/2Ddetection
+train: train.txt
+val: val.txt
+test: #test.txt
 
 # Classes
-# names:
-#   0: vehicle
-#   1: pedestrian
-#   2: bicycle
-#   3: rider
-#   4: roadblock
-#   5: head
-#   6: tsr
-#   7: guideboard
-#   8: plate
-#   9: wheel
-#   10: tl_border
-#   11: tl_wick
-#   12: tl_num
-#   13: sanlunche
-#   14: jiaoyunche
-
 names:
-  0: car
-  1: tinycar
-  2: bus
-  3: van
-  4: truck
-  5: tanker
-  6: large_truck
-  7: construction_vehicle
-  8: special_vehicle
-  9: unknown
-  10: pedestrian
-  11: bicycle
-  12: bicyclist
-  13: motorcycle
-  14: motorcyclist
-  15: tricycle
-  16: tricyclist
-  17: traffic_light_bbox
-  18: traffic_light_bulb
-  19: traffic_sign
-  20: animal
-  21: movable_object
-  22: warning_triangle
-  23: traffic_cone
-  24: water_barrier
-  25: crash_barrel
-  26: movable_barrier
-  27: bollard
-  28: sphere_bollard
-  29: cube_bollard
-  30: cylinder_bollard
-  31: construction_barrier
-  32: other_barrier
-  33: road_barrier_unknown
-  34: wheel
-  35: plate
-  36: face
+  0: vehicle
+  1: pedestrian
+  2: bicycle
+  3: rider
+  4: roadblock
+  5: head
+  6: tsr
+  7: guideboard
+  8: plate
+  9: wheel
+  10: tl_border
+  11: tl_wick
+  12: tl_num
+  13: rickshaw # sanlunche
+
+# names:
+#   0: car
+#   1: tinycar
+#   2: bus
+#   3: van
+#   4: truck
+#   5: tanker
+#   6: large_truck
+#   7: construction_vehicle
+#   8: special_vehicle
+#   9: unknown
+#   10: pedestrian
+#   11: bicycle
+#   12: bicyclist
+#   13: motorcycle
+#   14: motorcyclist
+#   15: tricycle
+#   16: tricyclist
+#   17: traffic_light_bbox
+#   18: traffic_light_bulb
+#   19: traffic_sign
+#   20: animal
+#   21: movable_object
+#   22: warning_triangle
+#   23: traffic_cone
+#   24: water_barrier
+#   25: crash_barrel
+#   26: movable_barrier
+#   27: bollard
+#   28: sphere_bollard
+#   29: cube_bollard
+#   30: cylinder_bollard
+#   31: construction_barrier
+#   32: other_barrier
+#   33: road_barrier_unknown
+#   34: wheel
+#   35: plate
+#   36: face
 
 # Download script/URL (optional)
 # download: https://github.com/ultralytics/assets/releases/download/v0.0.0/coco8.zip
 
 enable_3d: True  # enable 3D labels
+
+# 方式2：resize后过滤（基于绝对像素，相对resize后的图像）
+min_bbox_width_px: 8.0     # 过滤宽度<8像素的目标
+min_bbox_height_px: 8.0    # 过滤高度<8像素的目标
+min_bbox_area_px: 0.0     # 过滤面积<25像素²的目标
+
+# train full image
+roi_configs:
+  # ------------------- 配置 1: 广角 ROI (Wide-Angle) -------------------
+  # 目标: 覆盖更广的场景，保留上下文信息。
+  - name: "Wide_ROI"
+    # 裁剪后统一 resize 到的输出尺寸 (W, H)，这个尺寸必须与训练命令的 imgsz 匹配
+    output_shape: [704, 352]
+    
+    # ROI 策略：
+    roi_policy:
+      type: mixed  # 混合策略，根据原图分辨率选择不同规则
+      static:  # 针对特定分辨率使用固定裁剪
+        # 对于 4K 图像，使用一个较大的中心裁剪框
+        "3840x2160": [0, 100, 3840, 2020]  # 3840x1536 裁剪框 [x1, y1, x2, y2]
+      random:   # 其他分辨率使用随机窗口裁剪
+        type: random_window
+        aspect_ratio: 2.5          # 随机裁剪时维持的宽高比 (W/H)
+        seed: 42                   # 随机种子，保证可复现
+        prefer_full_width: false   # 是否优先使用全宽
+        rules:                     # 为其他常见分辨率指定裁剪窗口尺寸 (cropW, cropH)
+          "1920x1080": [1920, 960] # e.g., 从1080p图中随机裁剪1920x768
+          "1280x720": [704, 352]   # e.g., 从720p图中随机裁剪960x384

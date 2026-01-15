@@ -3078,3 +3078,95 @@ class ToTensor:
         im = im.half() if self.half else im.float()  # uint8 to fp16/32
         im /= 255.0  # 0-255 to 0.0-1.0
         return im
+
+
+class FilterSmallObjects:
+    """
+    Filter out small objects after image resize based on absolute pixel dimensions.
+    
+    This transform should be applied AFTER LetterBox to filter objects based on
+    their actual pixel size in the resized image.
+    Attributes:
+        min_width (float): Minimum width in pixels (default: 0)
+        min_height (float): Minimum height in pixels (default: 0)
+        min_area (float): Minimum area in pixels² (default: 0)
+        
+    Examples:
+        >>> filter_transform = FilterSmallObjects(min_width=5, min_height=5, min_area=25)
+        >>> labels = filter_transform(labels)
+    """
+
+    def __init__(self, min_width=0.0, min_height=0.0, min_area=0.0):
+        """
+        Initialize FilterSmallObjects transform.
+        
+        Args:
+            min_width (float): Minimum object width in pixels
+            min_height (float): Minimum object height in pixels
+            min_area (float): Minimum object area in pixels²
+        """
+        self.min_width = min_width
+        self.min_height = min_height
+        self.min_area = min_area
+        self.enabled = min_width > 0 or min_height > 0 or min_area > 0
+
+    def __call__(self, labels):
+        """
+        Filter small objects from labels based on resized image dimensions.
+        
+        Args:
+            labels (dict): Label dictionary containing'instances' and 'img'
+            
+        Returns:
+            (dict): Filtered label dictionary
+        """
+        if not self.enabled:
+            return labels
+
+        # Get image shape after resize (H, W, C)
+        img_h, img_w = labels["img"].shape[:2]
+
+        # Get instances (contains bboxes in normalized coordinates)
+        instances = labels.get("instances", None)
+        if instances is None or len(instances) == 0:
+            return labels
+
+        # Get normalized bboxes (format: xywh, normalized)
+        bboxes = instances.bboxes  # shape: (N, 4)
+
+        # Convert to absolute pixel dimensions
+        widths_px = bboxes[:, 2] #* img_w  # normalized width -> pixels
+        heights_px = bboxes[:, 3] #* img_h  # normalized height -> pixels
+        areas_px = widths_px * heights_px
+
+        # Create filter mask
+        valid_mask = np.ones(len(bboxes), dtype=bool)
+
+        if self.min_width > 0:
+            valid_mask &= (widths_px >= self.min_width)
+        if self.min_height > 0:
+            valid_mask &= (heights_px >= self.min_height)
+
+        if self.min_area > 0:
+            valid_mask &= (areas_px >= self.min_area)
+
+        # Apply filter to instances
+        labels["instances"] = instances[valid_mask]
+
+        # Filter other label fields if they exist
+        for key in ["cls", "bboxes", "segments", "keypoints", "obb"]:
+            if key in labels and labels[key] is not None:
+                if isinstance(labels[key], (list, np.ndarray)):
+                    if len(labels[key]) == len(valid_mask):
+                        if isinstance(labels[key], list):
+                            labels[key] = [labels[key][i] for i in range(len(valid_mask)) if valid_mask[i]]
+                        else:
+                            labels[key] = labels[key][valid_mask]
+
+        # Filter3D-related fields
+        for key in ["labels_3d", "faces_3d", "has_3d_mask", "vehicle_mask", "face_vis_mask", "face_weight"]:
+            if key in labels and labels[key] is not None:
+                if isinstance(labels[key], np.ndarray) and len(labels[key]) == len(valid_mask):
+                    labels[key] = labels[key][valid_mask]
+
+        return labels

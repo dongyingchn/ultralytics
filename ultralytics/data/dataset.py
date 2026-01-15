@@ -408,6 +408,21 @@ class YOLODataset(BaseDataset):
             transforms = v8_transforms(self, self.imgsz, hyp)
         else:
             transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
+
+        # 新增：在resize后添加小样本过滤
+        min_width_px = self.data.get("min_bbox_width_px", 0.0)
+        min_height_px = self.data.get("min_bbox_height_px", 0.0)
+        min_area_px = self.data.get("min_bbox_area_px", 0.0)
+
+        if min_width_px > 0 or min_height_px > 0 or min_area_px > 0:
+            from ultralytics.data.augment import FilterSmallObjects
+            filter_transform = FilterSmallObjects(
+                min_width=min_width_px,
+                min_height=min_height_px,
+                min_area=min_area_px
+            )
+            transforms.append(filter_transform)
+
         transforms.append(
             Format(
                 bbox_format="xywh",
